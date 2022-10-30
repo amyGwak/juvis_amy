@@ -35,6 +35,48 @@ class _Measure extends State<Measure> {
     super.dispose();
   }
 
+  void showKeepGoingAlert () {
+    List<String> menuList = ["계속", "-", "이번 동작 스킵", "측정 중단 후 다음에 할래요"];
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(
+              Radius.circular(20.0),
+            ),
+          ),
+          contentPadding: const EdgeInsets.all(20.0),
+          title: const Text("진행 의사",
+              style: TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center
+          ),
+          content: Container(
+            height: 300,
+            child: Column(
+              children: const [
+                Text("너무 힘들다면 다음 동작으로"),
+                Text("넘어갈까요?"),
+                // ListView.separated(
+                //     itemCount: menuList.length,
+                //     itemBuilder: (BuildContext context, int index) {
+                //       return ListTile(
+                //         onTap: (){},
+                //         title: Text("${menuList[index]}"),
+                //       )
+                //     },
+                //     separatorBuilder: (BuildContext context, int index) {
+                //       return Divider(thickness: 1);
+                //     },
+                // )
+              ]
+            )
+          )
+        );
+      }
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold (
@@ -153,15 +195,32 @@ class _Measure extends State<Measure> {
               padding: EdgeInsets.only(top: 30),
               child: Text("진행이 어렵다면?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
             ),
-            ElevatedButton(
-                onPressed: (){
-                  //modal open
-                },
-                child: const Text("진행이 어렵다면 눌러주세요")
+            Padding(
+              padding: const EdgeInsets.only(top: 10.0),
+              child: ElevatedButton(
+                  onPressed: (){
+                    //modal open
+                    showKeepGoingAlert();
+                  },
+                  child: const Text("진행이 어렵다면 눌러주세요"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.only(right: 10, left: 10),
+                ),
+              ),
             )
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {},
+        child: const Icon(Icons.link),
+        backgroundColor: Colors.grey
+
       )
     );
   }
 }
+
+
