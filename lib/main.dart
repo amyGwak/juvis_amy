@@ -18,6 +18,7 @@ class MyApp extends StatelessWidget {
       title: 'Juvis_Ex',
       theme: ThemeData(
         primaryColor: Colors.black,
+        scaffoldBackgroundColor: Colors.white,
       ),
       home: MyHomePage(),
     );
@@ -41,8 +42,8 @@ class _MyHomePageState extends State<MyHomePage> {
           margin: const EdgeInsets.only(top: 200),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 100),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 100),
                 child: Text("여기가 운동 메인 페이지", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
               ),
               ElevatedButton(
