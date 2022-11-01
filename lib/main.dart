@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:juvis_prac/bluetooth/puck.dart';
 import 'package:juvis_prac/widget/bluetooth_bottom_sheet.dart';
 import 'measure.dart';
 import 'exercise.dart';
@@ -12,6 +14,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Get.put(Puck());
     return MaterialApp(
       initialRoute: '/',
       routes: {
