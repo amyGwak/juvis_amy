@@ -25,7 +25,11 @@ class _Exercise extends State<Exercise> {
   bool isWearingWear = false;
   List<String> painPointList = ["어깨 통증", "팔이 두둑거림", "날개뼈 통증", "어지러움", "허리 통증"];
 
+  late int _playbackTime;
+  late Duration newCurrentPosition;
+  bool isFirstVideo = true;
   String defaultStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4";
+  String secondStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4";
   @override
   void initState() {
     Future.delayed(const Duration(milliseconds: 100));
@@ -37,6 +41,7 @@ class _Exercise extends State<Exercise> {
 
   @override
   void dispose() {
+    _initializeVideoPlayerFuture;
     _controller.dispose();
     super.dispose();
   }
@@ -48,10 +53,28 @@ class _Exercise extends State<Exercise> {
   }
 
   Future<void> changeVideo(String videoPath) async {
-     _controller = VideoPlayerController.network(videoPath);
-     _controller.addListener((){
+    print("🦋🦋 $videoPath");
+    newCurrentPosition = _controller.value.position;
 
+    setState(() {
+      _initializeVideoPlayerFuture;
+    });
+
+   await _controller.pause();
+
+    print("🥰🥰 $newCurrentPosition");
+     _controller = VideoPlayerController.network(videoPath);
+     _controller.addListener(() {
+       setState(() {
+         _playbackTime = _controller.value.position.inSeconds;
+       });
      });
+      _initializeVideoPlayerFuture = _controller.initialize().then((_){
+        print("initialized!!");
+        _controller.seekTo(newCurrentPosition);
+        _controller.play();
+      });
+
   }
 
   void showKeepGoingAlert () {
@@ -232,9 +255,16 @@ class _Exercise extends State<Exercise> {
                 top: 45,
                 child: Switch(
                   activeColor: Colors.white,
-                  value: true,
+                  value: isFirstVideo,
                   onChanged: (bool value) {
-
+                    if(isFirstVideo) {
+                      changeVideo(secondStream);
+                    } else {
+                      changeVideo(defaultStream);
+                    }
+                    setState((){
+                      isFirstVideo = !isFirstVideo;
+                    });
                   },
                 ),
               ),
