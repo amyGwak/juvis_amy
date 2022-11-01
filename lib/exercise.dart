@@ -3,6 +3,8 @@ import 'package:video_player/video_player.dart';
 import 'dart:async';
 import 'bluetooth/puck1.dart';
 import 'bluetooth/puck2.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 Puck1 puck1 = Puck1();
 Puck2 puck2 = Puck2();
@@ -22,21 +24,27 @@ class _Exercise extends State<Exercise> {
   bool puckConnected = false;
   bool _visible = true;
   bool isFullScreen = false;
-  bool isWearingWear = false;
-  List<String> painPointList = ["어깨 통증", "팔이 두둑거림", "날개뼈 통증", "어지러움", "허리 통증"];
 
-  late int _playbackTime;
+  List<String> painPointList = ["어깨 통증", "팔이 두둑거림", "날개뼈 통증", "어지러움", "허리 통증"];
+  late final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
+  late Future<bool> _isWearingWear;
+
   late Duration newCurrentPosition;
   bool isFirstVideo = true;
   String defaultStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4";
   String secondStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4";
+
+
   @override
   void initState() {
+    super.initState();
     Future.delayed(const Duration(milliseconds: 100));
     _controller = VideoPlayerController.network(defaultStream);
     _initializeVideoPlayerFuture = _controller.initialize();
     _controller.setLooping(true);
-    super.initState();
+    _isWearingWear = _prefs.then((SharedPreferences prefs) {
+      return prefs.getBool('isWearingRTWear') ?? false;
+    });
   }
 
   @override
@@ -52,6 +60,17 @@ class _Exercise extends State<Exercise> {
     });
   }
 
+  Future<void> _toggleIsWearing(bool value) async {
+    final SharedPreferences prefs = await _prefs;
+    final bool isWearingWear = !value;
+
+    setState((){
+      _isWearingWear = prefs.setBool('isWearingRTWear',!value).then((bool success){
+         return isWearingWear;
+      });
+    });
+  }
+
   Future<void> changeVideo(String videoPath) async {
     print("🦋🦋 $videoPath");
     newCurrentPosition = _controller.value.position;
@@ -64,13 +83,13 @@ class _Exercise extends State<Exercise> {
 
     print("🥰🥰 $newCurrentPosition");
      _controller = VideoPlayerController.network(videoPath);
-     _controller.addListener(() {
-       setState(() {
-         _playbackTime = _controller.value.position.inSeconds;
-       });
-     });
+
+     // _controller.addListener(() {
+     //   setState(() {
+     //     _playbackTime = _controller.value.position.inSeconds;
+     //   });
+     // });
       _initializeVideoPlayerFuture = _controller.initialize().then((_){
-        print("initialized!!");
         _controller.seekTo(newCurrentPosition);
         _controller.play();
       });
@@ -348,18 +367,26 @@ class _Exercise extends State<Exercise> {
               ),
             ),
             Padding(
+
               padding: const EdgeInsets.only(top: 20, left: 20, bottom: 30),
               child: Row(
                 children: [
                   const Text("RT웨어 착용"),
-                  Switch(
-                    activeColor: Colors.black,
-                    onChanged: (value){
-                      setState((){
-                        isWearingWear = !isWearingWear;
-                      });
-                    },
-                    value: isWearingWear,
+                  FutureBuilder<bool>(
+                    future: _isWearingWear,
+                    builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
+                      if(snapshot.connectionState == ConnectionState.done) {
+                          return Switch(
+                            activeColor: Colors.black,
+                            onChanged: (value) {
+                              _toggleIsWearing(snapshot.data!);
+                            },
+                            value: snapshot.data!,
+                          );
+                      } else {
+                        return const CircularProgressIndicator();
+                      }
+                    }
                   )
                 ]
               ),
@@ -371,7 +398,9 @@ class _Exercise extends State<Exercise> {
                 width: 320,
                 height: 50,
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    //완료했을 경우, 기록 저장 팝업을 띄운다.
+                  },
                   child: const Text("운동 완료!"),
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.black,

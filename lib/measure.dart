@@ -25,22 +25,61 @@ class _Measure extends State<Measure> {
   bool isFullScreen = false;
   List<String> painPointList = ["어깨 통증", "팔이 두둑거림", "날개뼈 통증", "어지러움", "허리 통증"];
 
+  late VoidCallback listener;
+  String defaultStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4";
+  String secondStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4";
+  String thirdStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/5%E1%84%8E%E1%85%A9.mp4";
+
+
   @override
   void initState() {
-    Future.delayed(const Duration(milliseconds: 100));
-    _controller = VideoPlayerController.network(
-        "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4");
-    _initializeVideoPlayerFuture = _controller.initialize();
-    _controller.setLooping(true);
-
     super.initState();
+
+    Future.delayed(const Duration(milliseconds: 100));
+
+    listener() {
+      if(_controller.value.isInitialized && !_controller.value.isPlaying){
+        Duration duration = _controller.value.duration;
+        Duration position = _controller.value.position;
+        if(duration?.compareTo(position) == 0 || duration?.compareTo(position) == -1){
+          print("!!!!!!🐣🐣");
+          //종료시점일 경우,
+          setState(() {
+            _initializeVideoPlayerFuture;
+          });
+          currentVideoOrder = currentVideoOrder + 1;
+          _controller = VideoPlayerController.network(defaultStream);
+          _initializeVideoPlayerFuture = _controller.initialize().then((_){
+            _controller.seekTo(Duration.zero);
+            _controller.setLooping(true);
+            _controller.play();
+            setState((){});
+          });
+        }
+      }
+    }
+
+    _controller = VideoPlayerController.network(thirdStream)..addListener(listener);
+    _initializeVideoPlayerFuture = _controller.initialize();
+
+
+  }
+
+  @override
+  void deactivate() {
+    super.deactivate();
+    _controller.removeListener(listener);
+    _controller.setVolume(0.0);
   }
 
   @override
   void dispose() {
+    _initializeVideoPlayerFuture;
     _controller.dispose();
     super.dispose();
   }
+
+
 
   void _toggle(){
     setState((){
