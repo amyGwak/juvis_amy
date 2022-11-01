@@ -43,10 +43,6 @@ class _Measure extends State<Measure> {
   }
 
   void _toggle(){
-
-    print("clicked!!");
-    print("🐣🐣🐣 $_visible");
-
     setState((){
       _visible = !_visible;
     });
@@ -151,12 +147,22 @@ class _Measure extends State<Measure> {
                                     _toggle();
                                   },
                                   child: Stack(
-                                    fit: isFullScreen ? StackFit.expand : StackFit.loose,
                                     children: [
+                                      isFullScreen ?
+                                      RotatedBox(
+                                        quarterTurns: 1,
+                                        child: AspectRatio(
+                                          aspectRatio: _controller.value.aspectRatio,
+                                          child: Container(
+                                            // height: 100,
+                                              color: Colors.black,
+                                              child: VideoPlayer(_controller)),
+                                        ),
+                                      ) :
                                       AspectRatio(
                                         aspectRatio: _controller.value.aspectRatio,
                                         child: Container(
-                                            height: 100,
+                                            // height: 100,
                                             color: Colors.black,
                                             child: VideoPlayer(_controller)),
                                       ),
@@ -205,25 +211,25 @@ class _Measure extends State<Measure> {
                                 color: Colors.blue),
                           )
 
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    top: 30,
+                    right: 0,
+                    child: IconButton(
+                      icon: const Icon(Icons.fullscreen),
+                      color: Colors.white,
+                      iconSize: 25,
+                      onPressed: (){
+                        //full screen horizontal
+                        setState((){
+                          isFullScreen = !isFullScreen;
+                        });
+                      },
                     ),
                   ),
-                ),
-                Positioned(
-                  top: 30,
-                  right: 0,
-                  child: IconButton(
-                    icon: const Icon(Icons.fullscreen),
-                    color: Colors.white,
-                    iconSize: 25,
-                    onPressed: (){
-                      //full screen horizontal
-                      setState((){
-                        isFullScreen = !isFullScreen;
-                      });
-                    },
-                  ),
-                ),
-              ]
+                ]
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
