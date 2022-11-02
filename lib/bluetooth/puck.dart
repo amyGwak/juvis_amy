@@ -55,9 +55,8 @@ class Puck extends GetxController {
     flutterBlue.scanResults.listen((results) {
       for (ScanResult r in results) {
         if (r.device.name == PUCK1 || r.device.name == PUCK2) {
-          if (scanList.value.every((device) => device.id != r.device.id)) {
-            scanList.value.add(r.device);
-            [...scanList.value, r.device];
+          if (scanList.every((device) => device.id != r.device.id)) {
+            scanList.value = [...scanList, r.device];
           }
         }
       }
@@ -65,6 +64,24 @@ class Puck extends GetxController {
     await flutterBlue.stopScan();
     scanning.value = false;
 
-    return scanList.value;
+    return scanList;
+  }
+
+  void stopScan() async {
+    //타이밍 이슈
+    await flutterBlue.stopScan();
+    scanList.value = [];
+    scanning.value = false;
+  }
+
+  String getTranslatedDeviceName(String name) {
+    switch (name) {
+      case PUCK1:
+        return '상의용';
+      case PUCK2:
+        return '하의용';
+      default:
+        return '';
+    }
   }
 }
