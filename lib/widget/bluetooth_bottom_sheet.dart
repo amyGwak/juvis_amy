@@ -93,6 +93,20 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                         height: 20,
                       ),
                       Heading(title: '등록된 기기'),
+                      if (puck.puck1.value != null)
+                        ListTile(
+                          leading: Icon(Icons.device_hub),
+                          title: Text(puck
+                              .getTranslatedDeviceName(puck.puck1.value!.name)),
+                          subtitle: Text(puck.connectStatePuck1.toString()),
+                        ),
+                      if (puck.puck2.value != null)
+                        ListTile(
+                          leading: Icon(Icons.device_hub),
+                          title: Text(puck
+                              .getTranslatedDeviceName(puck.puck2.value!.name)),
+                          subtitle: Text(puck.connectStatePuck2.toString()),
+                        ),
                       Heading(title: '연결 가능한 기기'),
                       SizedBox(
                           height: 300,
@@ -100,12 +114,19 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                               itemCount: puck.scanList.length,
                               itemBuilder: (context, index) {
                                 return ListTile(
-                                    leading: Icon(Icons.device_hub),
-                                    title: Text(puck.getTranslatedDeviceName(
-                                        puck.scanList[index].name)),
-                                    subtitle: Column(children: <Widget>[
-                                      Text(puck.scanList[index].name),
-                                    ]));
+                                  leading: Icon(Icons.device_hub),
+                                  title: Text(puck.getTranslatedDeviceName(
+                                      puck.scanList[index].name)),
+                                  subtitle: Column(children: <Widget>[
+                                    Text(puck.scanList[index].name),
+                                  ]),
+                                  trailing: GestureDetector(
+                                    onTap: () {
+                                      puck.connectDevice(puck.scanList[index]);
+                                    },
+                                    child: Icon(Icons.connect_without_contact),
+                                  ),
+                                );
                               })),
                     ]),
               ))
