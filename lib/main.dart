@@ -4,6 +4,7 @@ import 'package:juvis_prac/bluetooth/puck.dart';
 import 'package:juvis_prac/widget/bluetooth_bottom_sheet.dart';
 import 'measure.dart';
 import 'exercise.dart';
+import 'metronome.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,6 +21,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/measure': (context) => const Measure(),
         '/exercise': (context) => const Exercise(),
+        '/timer' : (context) => const TimerTest(),
       },
       title: 'Juvis_Ex',
       theme: ThemeData(
@@ -46,6 +48,7 @@ class _MyHomePageState extends State<MyHomePage> {
       toggleIcon = value;
     });
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +113,25 @@ class _MyHomePageState extends State<MyHomePage> {
               child: const Text("운동 페이지 이동"),
               onPressed: () {
                 Navigator.pushNamed(context, '/exercise');
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 20),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.only(
+                    left: 16, right: 16, top: 10, bottom: 10),
+                textStyle: const TextStyle(fontSize: 16),
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10), // <-- Radius
+                ),
+              ),
+              child: const Text("타이머 테스트"),
+              onPressed: () {
+                Navigator.pushNamed(context, '/timer');
               },
             ),
           ),
