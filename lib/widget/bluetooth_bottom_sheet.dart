@@ -60,7 +60,9 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                       ),
                       puck.scanning.value == true
                           ? OutlinedButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                puck.stopScan();
+                              },
                               style: ElevatedButton.styleFrom(
                                 fixedSize: Size(9999, 40),
                               ),
@@ -99,11 +101,12 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                               itemBuilder: (context, index) {
                                 return ListTile(
                                     leading: Icon(Icons.device_hub),
-                                    title: Text(puck.scanList[index].name),
+                                    title: Text(puck.getTranslatedDeviceName(
+                                        puck.scanList[index].name)),
                                     subtitle: Column(children: <Widget>[
                                       Text(puck.scanList[index].name),
                                     ]));
-                              }))
+                              })),
                     ]),
               ))
             ],
