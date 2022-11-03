@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:juvis_prac/bluetooth/puck.dart';
 import 'package:juvis_prac/widget/bluetooth_bottom_sheet.dart';
-import 'measure.dart';
-import 'exercise.dart';
-import 'metronome.dart';
+import 'video/measure.dart';
+import 'video/exercise.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,7 +20,6 @@ class MyApp extends StatelessWidget {
       routes: {
         '/measure': (context) => const Measure(),
         '/exercise': (context) => const Exercise(),
-        '/timer' : (context) => const TimerTest(),
       },
       title: 'Juvis_Ex',
       theme: ThemeData(

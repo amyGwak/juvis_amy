@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:async';
-import 'bluetooth/puck1.dart';
-import 'bluetooth/puck2.dart';
+import '../bluetooth/puck1.dart';
+import '../bluetooth/puck2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'popup.dart';
+import '../popup.dart';
 
 
 Puck1 puck1 = Puck1();
