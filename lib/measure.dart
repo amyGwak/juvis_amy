@@ -75,7 +75,7 @@ class _Measure extends State<Measure> {
   void initState() {
     super.initState();
 
-    Future.delayed(const Duration(milliseconds: 100));
+    // Future.delayed(const Duration(milliseconds: 100));
 
     if(mounted && streamUrl.isNotEmpty) {
       _initController(0).then((_) {
@@ -109,6 +109,7 @@ class _Measure extends State<Measure> {
     // 마지막 controller와 그 이전 controller 지워주기
     _humanController(currentVideoOrder).dispose();
     _controller(currentVideoOrder).dispose();
+    _timer.cancel();
     super.dispose();
   }
 
