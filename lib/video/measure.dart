@@ -37,6 +37,9 @@ class _Measure extends State<Measure> {
   final Map<String, VideoPlayerController> _humanControllers = {};
   final Map<int, VoidCallback> _humanListeners = {};
 
+
+
+
   bool _lock = true;
   late Timer _timer;
 
@@ -58,15 +61,24 @@ class _Measure extends State<Measure> {
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/5%E1%84%8E%E1%85%A9.mp4",
   };
 
+  // 대체 영상 1개
+  // 본 운동이 싫으면 언제든지 대체 가능해야 한다. 이거는 지금 changeVideo 처럼 하면 된다.
+
+  String alterUrl = "https://amytest2.s3.ap-northeast-2.amazonaws.com/alter.mp4";
+  late VideoPlayerController alterController;
+  late VoidCallback _alterListeners;
+  // 대체 영상이 종료 되면 currentVideoOrder++, break 영상으로 넘어간다. 그리고 본 운동의 human / default mode에 따라 controller(currentVideoOrder)로 바꿔준다.
+
+  // break 영상 1개
+  // break 영상은 무조건 본 운동 사이에 나와야 함!
+  // 영상1 - break - 영상2 - break - 영상3 - break - 영상4 - break - 영상5 - break - 영상6 - break - 영상7 - break - 영상8 - break - 영상9
+  String breakUrl = "https://amytest2.s3.ap-northeast-2.amazonaws.com/break.mp4";
+  late VideoPlayerController breakController;
+  late VoidCallback _breakListeners;
+  // 본운동이 종료되면, break 영상이 들어온다. 그리고 본 운동의 mode에 따라 다음 영상을 틀어준다.
+
+
   List<int> videoOrder = [];
-
-  // 영상 교체 토글도 만들어야 함
-
-  // 대체 영상 1개 -> 얘네 controller도 만들어야함
-  String alterUrl = "";
-
-  // break 영상 1개 -> 얘네 controller도 만들어야함
-  String breakUrl = "";
 
 
   @override
@@ -178,12 +190,18 @@ class _Measure extends State<Measure> {
   Future<void> _initController(int index) async {
     var controller = VideoPlayerController.network(streamUrl.elementAt(index));
     var humanController = VideoPlayerController.network(humanCountUrl.elementAt(index));
+    var alterController = VideoPlayerController.network(alterUrl);
+    var breakController = VideoPlayerController.network(breakUrl);
 
     _controllers[streamUrl.elementAt(index)] = controller;
     _humanControllers[humanCountUrl.elementAt(index)] = humanController;
 
     await controller.initialize();
     await humanController.initialize();
+
+    // 대체영상과 break 영상도 초기화
+    await alterController.initialize();
+    await breakController.initialize();
   }
 
   // controller 아예 삭제

@@ -40,7 +40,6 @@ class _ExVideo extends State<ExVideo> {
 
   @override
   void dispose() {
-    // widget.controller.dispose();
     super.dispose();
   }
 
@@ -139,6 +138,17 @@ class _ExVideo extends State<ExVideo> {
                 value: widget.isHumanCountMode,
                 onChanged: (bool value) {
                   widget.changeVideo();
+                },
+              ),
+            ),
+            Positioned(
+              top: 100,
+              right: 0,
+              child: Switch(
+                activeColor: Colors.red,
+                value: false,
+                onChanged: (bool value) {
+                  print("대체 영상 준비");
                 },
               ),
             ),
