@@ -22,7 +22,14 @@ class Puck extends GetxController {
   RxBool scanning = false.obs;
 
 //PUCK1
-  Rx<BluetoothDeviceState?> connectStatePuck1 = Rx<BluetoothDeviceState?>(null);
+
+  //flutter_blue_plus용 퍽 연결상태 state
+  Rx<BluetoothDeviceState> connectStatePuck1 =
+      Rx<BluetoothDeviceState>(BluetoothDeviceState.disconnected);
+
+  //임의로 만든 퍽 연결상태 state
+  Rx<BluetoothDeviceState> deviceStatePuck1 =
+      Rx<BluetoothDeviceState>(BluetoothDeviceState.disconnected);
   Rx<BluetoothDevice?> puck1 = Rx<BluetoothDevice?>(null);
   BluetoothService? servicePuck1;
   BluetoothCharacteristic? charState1; //0001 특성
@@ -34,7 +41,13 @@ class Puck extends GetxController {
   BluetoothCharacteristic? blueMotionErr1; //0007 모션에러
 
 //PUCK2
-  Rx<BluetoothDeviceState?> connectStatePuck2 = Rx<BluetoothDeviceState?>(null);
+
+  //flutter_blue_plus용 퍽 연결상태 state
+  Rx<BluetoothDeviceState> connectStatePuck2 =
+      Rx<BluetoothDeviceState>(BluetoothDeviceState.disconnected);
+  //임의로 만든 퍽 연결상태 state
+  Rx<BluetoothDeviceState> deviceStatePuck2 =
+      Rx<BluetoothDeviceState>(BluetoothDeviceState.disconnected);
   Rx<BluetoothDevice?> puck2 = Rx<BluetoothDevice?>(null);
   BluetoothService? servicePuck2;
   BluetoothCharacteristic? charState2; //0001 특성
@@ -96,6 +109,8 @@ class Puck extends GetxController {
 
     //Puck1
     if (device.name == PUCK1) {
+      deviceStatePuck1.value = BluetoothDeviceState.connecting;
+
       device.state.listen((state) {
         connectStatePuck1.value = state; //puck1의 상태 데이터 저장
         switch (state) {
@@ -105,6 +120,7 @@ class Puck extends GetxController {
             break;
           case BluetoothDeviceState.connected:
             print('🔥🔥connected');
+            deviceStatePuck1.value = BluetoothDeviceState.connected;
             puck1.value = device;
             setService(device);
             // Todo ::: 스캔 리스트에서 연결중인 퍽 삭제
@@ -114,14 +130,18 @@ class Puck extends GetxController {
             break;
           case BluetoothDeviceState.disconnected:
             print('🔥🔥disconnected');
+            deviceStatePuck1.value = BluetoothDeviceState.disconnected;
+            connectStatePuck1.value = BluetoothDeviceState.disconnected;
             puck1.value = null;
-            connectStatePuck1.value = null;
             servicePuck1 = null;
+
             break;
           default:
         }
       });
     } else if (device.name == PUCK2) {
+      deviceStatePuck2.value = BluetoothDeviceState.connecting;
+
       device.state.listen((state) {
         connectStatePuck2.value = state; //puck1의 상태 데이터 저장
         switch (state) {
@@ -131,6 +151,7 @@ class Puck extends GetxController {
             break;
           case BluetoothDeviceState.connected:
             print('🐳🐳connected');
+            deviceStatePuck2.value = BluetoothDeviceState.connected;
             puck2.value = device;
             setService(device);
             // Todo ::: 스캔 리스트에서 연결중인 퍽 삭제
@@ -140,8 +161,9 @@ class Puck extends GetxController {
             break;
           case BluetoothDeviceState.disconnected:
             print('🐳🐳disconnected');
+            deviceStatePuck2.value = BluetoothDeviceState.disconnected;
+            connectStatePuck2.value = BluetoothDeviceState.disconnected;
             puck2.value = null;
-            connectStatePuck2.value = null;
             servicePuck2 = null;
             break;
           default:

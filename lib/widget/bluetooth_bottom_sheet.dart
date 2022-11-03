@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:get/get.dart';
 import 'package:juvis_prac/bluetooth/puck.dart';
 
@@ -93,12 +94,14 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                         height: 20,
                       ),
                       Heading(title: '등록된 기기'),
+
+                      //PUCK1
                       if (puck.puck1.value != null)
                         ListTile(
                           leading: Icon(Icons.device_hub),
                           title: Text(puck
                               .getTranslatedDeviceName(puck.puck1.value!.name)),
-                          subtitle: Text(puck.connectStatePuck1.toString()),
+                          subtitle: Text(puck.deviceStatePuck1.toString()),
                           trailing: GestureDetector(
                             child: Icon(Icons.close),
                             onTap: () {
@@ -106,18 +109,30 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                             },
                           ),
                         ),
+                      if (puck.deviceStatePuck1.value ==
+                          BluetoothDeviceState.connected)
+                        Column(
+                          children: [],
+                        ),
+
+                      //PUCK2
                       if (puck.puck2.value != null)
                         ListTile(
                           leading: Icon(Icons.device_hub),
                           title: Text(puck
                               .getTranslatedDeviceName(puck.puck2.value!.name)),
-                          subtitle: Text(puck.connectStatePuck2.toString()),
+                          subtitle: Text(puck.deviceStatePuck2.toString()),
                           trailing: GestureDetector(
                             child: Icon(Icons.close),
                             onTap: () {
                               puck.disconnectDevice(puck.puck2.value!);
                             },
                           ),
+                        ),
+                      if (puck.deviceStatePuck2.value ==
+                          BluetoothDeviceState.connected)
+                        Column(
+                          children: [],
                         ),
                       Heading(title: '연결 가능한 기기'),
                       SizedBox(
