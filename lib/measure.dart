@@ -1,8 +1,10 @@
+import 'dart:ffi';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:async';
 import 'bluetooth/puck1.dart';
 import 'bluetooth/puck2.dart';
+import 'popup.dart';
 
 
 Puck1 puck1 = Puck1();
@@ -16,19 +18,53 @@ class Measure extends StatefulWidget {
 }
 
 class _Measure extends State<Measure> {
-  late VideoPlayerController _controller;
+  // late VideoPlayerController _controller;
   late Future<void> _initializeVideoPlayerFuture;
-  List<int> videoOrder = List<int>.generate(11, (i) => i + 1);
-  int currentVideoOrder = 1;
+
+  //다음 영상을 초기화할 컨트롤러를 미리 생성
+  late VideoPlayerController _nextController;
+  late Future<void> _initializeNextVideoPlayerFuture;
+
+
+  int currentVideoOrder = 0;
+  int currentCount = 0;
   bool puckConnected = false;
   bool _visible = true;
   bool isFullScreen = false;
+  bool isCurrentVideoEnd = false;
+  bool isPlayStarted = false;
   List<String> painPointList = ["어깨 통증", "팔이 두둑거림", "날개뼈 통증", "어지러움", "허리 통증"];
 
   late VoidCallback listener;
   String defaultStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4";
   String secondStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4";
-  String thirdStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/5%E1%84%8E%E1%85%A9.mp4";
+  String thirdStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4";
+
+  final Map<String, VideoPlayerController> _controllers = {};
+  final Map<int, VoidCallback> _listeners = {};
+  double _position = 0;
+  double _buffer = 0;
+  bool _lock = true;
+  late Timer _timer;
+
+  //운동 영상
+  Set<String> streamUrl = {
+    "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
+    "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4",
+    "https://amytest2.s3.ap-northeast-2.amazonaws.com/5%E1%84%8E%E1%85%A9.mp4",
+    "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4",
+    "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4"
+  };
+
+  List<int> videoOrder = [];
+
+  // 영상 교체 토글도 만들어야 함
+
+  // 대체 영상 1개 -> 얘네 controller도 만들어야함
+  String alterUrl = "";
+
+  // break 영상 1개 -> 얘네 controller도 만들어야함
+  String breakUrl = "";
 
 
   @override
@@ -37,48 +73,114 @@ class _Measure extends State<Measure> {
 
     Future.delayed(const Duration(milliseconds: 100));
 
-    listener() {
-      if(_controller.value.isInitialized && !_controller.value.isPlaying){
-        Duration duration = _controller.value.duration;
-        Duration position = _controller.value.position;
-        if(duration?.compareTo(position) == 0 || duration?.compareTo(position) == -1){
-          print("!!!!!!🐣🐣");
-          //종료시점일 경우,
-          setState(() {
-            _initializeVideoPlayerFuture;
+    if(streamUrl.length > 0) {
+      _initController(0).then((_) {
+        _playController(0);
+        _timer = Timer.periodic(Duration(seconds: 2), (timer) {
+          setState((){
+            currentCount++;
           });
-          currentVideoOrder = currentVideoOrder + 1;
-          _controller = VideoPlayerController.network(defaultStream);
-          _initializeVideoPlayerFuture = _controller.initialize().then((_){
-            _controller.seekTo(Duration.zero);
-            _controller.setLooping(true);
-            _controller.play();
-            setState((){});
-          });
-        }
-      }
+        });
+      });
+    }
+    if(streamUrl.length > 1) {
+      _initController(1).whenComplete(() => _lock = false);
     }
 
-    _controller = VideoPlayerController.network(thirdStream)..addListener(listener);
-    _initializeVideoPlayerFuture = _controller.initialize();
-
+    videoOrder = List<int>.generate(streamUrl.length + 1, (i) => i + 1);
 
   }
 
   @override
   void deactivate() {
     super.deactivate();
-    _controller.removeListener(listener);
-    _controller.setVolume(0.0);
   }
 
   @override
   void dispose() {
-    _initializeVideoPlayerFuture;
-    _controller.dispose();
     super.dispose();
   }
 
+  VideoPlayerController _controller(int index) {
+    return _controllers[streamUrl.elementAt(index)]!;
+  }
+
+  VoidCallback _listenerSpawner(index) {
+    return () {
+      int? duration = _controller(index).value.duration.inSeconds;
+      int? position = _controller(index).value.position.inSeconds;
+      int? buffer = _controller(index).value.buffered.last.end.inSeconds;
+
+      setState((){
+        if(duration <= position) {
+          _position = 0;
+          return;
+        }
+        _position = position / duration;
+        _buffer = buffer / duration;
+      });
+
+      if(duration - position < 1) {
+        if(index < streamUrl.length - 1) {
+          _nextVideo();
+          currentCount = 0;
+        }
+      }
+    };
+  }
+
+
+
+  Future<void> _initController(int index) async {
+    var controller = VideoPlayerController.network(streamUrl.elementAt(index));
+    _controllers[streamUrl.elementAt(index)] = controller;
+    await controller.initialize();
+  }
+
+  void _removeController(int index) {
+    _controller(index).dispose();
+    _controllers.remove(streamUrl.elementAt(index));
+    _listeners.remove(index);
+  }
+
+  void _stopController(int index) {
+    _controller(index).removeListener(_listeners[index]!);
+    _controller(index).pause();
+    _controller(index).seekTo(Duration.zero);
+  }
+
+
+  void _playController(int index) async {
+    if(!_listeners.keys.contains(index)) {
+      _listeners[index] = _listenerSpawner(index);
+    }
+    _controller(index).addListener(_listeners[index]!);
+    await _controller(index).play();
+    setState((){});
+
+  }
+
+  void _nextVideo () async {
+    if(_lock || currentVideoOrder == streamUrl.length - 1) {
+      return;
+    }
+    _lock = true;
+    _stopController(currentVideoOrder);
+
+    if(currentVideoOrder - 1 >= 0) {
+      _removeController(currentVideoOrder -1);
+    }
+
+    _playController(++currentVideoOrder);
+
+    if(currentVideoOrder == streamUrl.length - 1){
+      _lock = false;
+    } else {
+      _initController(currentVideoOrder + 1).whenComplete(() => _lock = false);
+    }
+
+
+  }
 
 
   void _toggle(){
@@ -175,11 +277,11 @@ class _Measure extends State<Measure> {
                 Stack(
                   alignment: Alignment.center,
                   children: [
-                    FutureBuilder(
-                        future: _initializeVideoPlayerFuture,
-                        builder: (context, snapshot) {
-                          if(snapshot.connectionState == ConnectionState.done) {
-                            return Column(
+                    // FutureBuilder(
+                        // future: _initializeVideoPlayerFuture_controller(index),
+                        // builder: (context, snapshot) {
+                          // if(snapshot.connectionState == ConnectionState.done) {
+                            Column(
                               children: [
                                 GestureDetector(
                                   onTap: (){
@@ -191,41 +293,43 @@ class _Measure extends State<Measure> {
                                       RotatedBox(
                                         quarterTurns: 1,
                                         child: AspectRatio(
-                                          aspectRatio: _controller.value.aspectRatio,
+                                          aspectRatio: _controller(currentVideoOrder).value.aspectRatio,
                                           child: Container(
                                             // height: 100,
                                               color: Colors.black,
-                                              child: VideoPlayer(_controller)),
+                                              child: VideoPlayer(_controller(currentVideoOrder))),
                                         ),
                                       ) :
                                       AspectRatio(
-                                        aspectRatio: _controller.value.aspectRatio,
+                                        aspectRatio: _controller(currentVideoOrder).value.aspectRatio,
                                         child: Container(
                                             // height: 100,
                                             color: Colors.black,
-                                            child: VideoPlayer(_controller)),
+                                            child: VideoPlayer(_controller(currentVideoOrder))),
                                       ),
                                     ]
                                   ),
                                 ),
-                                  VideoProgressIndicator(_controller,
+                                  VideoProgressIndicator(
+                                    _controller(currentVideoOrder),
                                       allowScrubbing: false,
                                   ),
                                 // Text("$position", textAlign: TextAlign.start),
                                   ValueListenableBuilder(
-                                    valueListenable: _controller,
+                                    valueListenable: _controller(currentVideoOrder),
                                     builder: (context, VideoPlayerValue value, child) {
                                       //Do Something with the value.
                                       return Text(value.position.toString().split('.')[0]);
                                     },
                                   ),
                               ]
-                            );
-                          } else {
-                            return const Center(child: CircularProgressIndicator());
-                          }
-                        }
-                    ),
+                            ),
+                          // }
+                          // else {
+                          //   return const Center(child: CircularProgressIndicator());
+                          // }
+                        // }
+                    // ),
                     Center(
                       child: Visibility(
                         visible: _visible,
@@ -234,18 +338,26 @@ class _Measure extends State<Measure> {
                           backgroundColor: Colors.white60,
                           child: IconButton(
                             onPressed: (){
-                              if(_controller.value.isPlaying) {
-                                _controller.pause();
+                              if(_controller(currentVideoOrder).value.isPlaying) {
+                                _controller(currentVideoOrder).pause();
+                                _timer.cancel();
                                 _visible = true;
                               } else {
-                                _controller.play();
+                                _controller(currentVideoOrder).play();
                                 setState((){
                                   _visible = false;
+                                  if(!_timer.isActive){
+                                    _timer = Timer.periodic(Duration(seconds: 2), (timer) {
+                                      setState((){
+                                        currentCount++;
+                                      });
+                                    });
+                                  }
                                 });
                               }
                             },
                             icon: Icon(
-                                _controller.value.isPlaying == true ? Icons.pause : Icons.play_arrow,
+                                _controller(currentVideoOrder).value.isPlaying == true ? Icons.pause : Icons.play_arrow,
                                 size: 20,
                                 color: Colors.blue),
                           )
@@ -288,38 +400,38 @@ class _Measure extends State<Measure> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: [
-                      for(num i=1; i<12; i++)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 20),
-                            child: TextButton(
-                                onPressed: () {
-                                    print("🌼🌼$i is clicked");
-                                    setState((){
-                                      currentVideoOrder = int.parse("$i");
-                                    });
-                                },
-                                style: TextButton.styleFrom(
-                                    textStyle: const TextStyle(fontSize: 16),
-                                    backgroundColor: currentVideoOrder == int.parse("$i") ? Colors.orangeAccent : Colors.transparent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(100), // <-- Radius
-                                  ),
+                      children: [
+                      for(num i=1; i<_controller(currentVideoOrder).value.duration.inSeconds/2 + 1; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: TextButton(
+                              onPressed: () {
+                                  print("🌼🌼$i is clicked");
+                                  setState((){
+                                    currentCount = int.parse("$i");
+                                  });
+                              },
+                              style: TextButton.styleFrom(
+                                  textStyle: const TextStyle(fontSize: 16),
+                                  backgroundColor: currentCount == int.parse("$i") ? Colors.orangeAccent : Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(100), // <-- Radius
                                 ),
-                                    child: Text("$i",
-                                        style: TextStyle(
-                                            color: currentVideoOrder == int.parse("$i") ? Colors.black : Colors.grey,
-                                        )),
-                                ),
-                          ),
+                              ),
+                                  child: Text("$i",
+                                      style: TextStyle(
+                                          color: currentCount == int.parse("$i") ? Colors.black : Colors.grey,
+                                      )),
+                              ),
+                        ),
 
                       ]
                     )
                   ),
                   GestureDetector(
                     onTap: (){
-                      _controller.seekTo(Duration.zero);
-                      _controller.play();
+                      _controller(currentVideoOrder).seekTo(Duration.zero);
+                      _controller(currentVideoOrder).play();
                     },
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -411,6 +523,32 @@ class _Measure extends State<Measure> {
                           ),
                         )
                       ]
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: SizedBox(
+                        width: 320,
+                        height: 50,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            //측정 완료 팝업 띄우기기
+                            showDialog(
+                                context: context,
+                                builder: (context) {
+                                  return const ShowLastPopup(route: "/");
+                                }
+                            );
+                          },
+                          child: const Text("측정 완료하기!"),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],

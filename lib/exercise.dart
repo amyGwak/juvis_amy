@@ -4,6 +4,7 @@ import 'dart:async';
 import 'bluetooth/puck1.dart';
 import 'bluetooth/puck2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'popup.dart';
 
 
 Puck1 puck1 = Puck1();
@@ -31,7 +32,7 @@ class _Exercise extends State<Exercise> {
 
   late Duration newCurrentPosition;
   bool isFirstVideo = true;
-  String defaultStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4";
+  String defaultStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4";
   String secondStream = "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4";
 
 
@@ -83,16 +84,10 @@ class _Exercise extends State<Exercise> {
 
     print("🥰🥰 $newCurrentPosition");
      _controller = VideoPlayerController.network(videoPath);
-
-     // _controller.addListener(() {
-     //   setState(() {
-     //     _playbackTime = _controller.value.position.inSeconds;
-     //   });
-     // });
-      _initializeVideoPlayerFuture = _controller.initialize().then((_){
-        _controller.seekTo(newCurrentPosition);
-        _controller.play();
-      });
+    _initializeVideoPlayerFuture = _controller.initialize().then((_){
+      _controller.seekTo(newCurrentPosition);
+      _controller.play();
+    });
 
   }
 
@@ -158,6 +153,7 @@ class _Exercise extends State<Exercise> {
         }
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -400,6 +396,12 @@ class _Exercise extends State<Exercise> {
                 child: OutlinedButton(
                   onPressed: () {
                     //완료했을 경우, 기록 저장 팝업을 띄운다.
+                    showDialog(
+                        context: context,
+                        builder: (context) {
+                          return const ShowFeedBackScore();
+                        }
+                    );
                   },
                   child: const Text("운동 완료!"),
                   style: OutlinedButton.styleFrom(
@@ -413,4 +415,6 @@ class _Exercise extends State<Exercise> {
           ],
         )));
   }
+
+
 }
