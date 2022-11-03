@@ -114,6 +114,9 @@ class Puck extends GetxController {
             break;
           case BluetoothDeviceState.disconnected:
             print('🔥🔥disconnected');
+            puck1.value = null;
+            connectStatePuck1.value = null;
+            servicePuck1 = null;
             break;
           default:
         }
@@ -137,6 +140,9 @@ class Puck extends GetxController {
             break;
           case BluetoothDeviceState.disconnected:
             print('🐳🐳disconnected');
+            puck2.value = null;
+            connectStatePuck2.value = null;
+            servicePuck2 = null;
             break;
           default:
         }
@@ -146,18 +152,6 @@ class Puck extends GetxController {
 
   void disconnectDevice(BluetoothDevice device) {
     device.disconnect();
-
-    switch (device.name) {
-      case PUCK1:
-        puck1.value = null;
-        connectStatePuck1.value = null;
-        break;
-      case PUCK2:
-        puck2.value = null;
-        connectStatePuck2.value = null;
-        break;
-      default:
-    }
   }
 
   void setService(BluetoothDevice device) async {
