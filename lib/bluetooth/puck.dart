@@ -24,7 +24,7 @@ class Puck extends GetxController {
 //PUCK1
   Rx<BluetoothDeviceState?> connectStatePuck1 = Rx<BluetoothDeviceState?>(null);
   Rx<BluetoothDevice?> puck1 = Rx<BluetoothDevice?>(null);
-
+  BluetoothService? servicePuck1;
   BluetoothCharacteristic? charState1; //0001 특성
   BluetoothCharacteristic? charFreq1; //0002 주파모드
   BluetoothCharacteristic? charFreqLevel1; //0003 주파강도
@@ -36,6 +36,7 @@ class Puck extends GetxController {
 //PUCK2
   Rx<BluetoothDeviceState?> connectStatePuck2 = Rx<BluetoothDeviceState?>(null);
   Rx<BluetoothDevice?> puck2 = Rx<BluetoothDevice?>(null);
+  BluetoothService? servicePuck2;
   BluetoothCharacteristic? charState2; //0001 특성
   BluetoothCharacteristic? charFreq2; //0002 주파모드
   BluetoothCharacteristic? charFreqLevel2; //0003 주파강도
@@ -105,6 +106,7 @@ class Puck extends GetxController {
           case BluetoothDeviceState.connected:
             print('🔥🔥connected');
             puck1.value = device;
+            setService(device);
             // Todo ::: 스캔 리스트에서 연결중인 퍽 삭제
             break;
           case BluetoothDeviceState.disconnecting:
@@ -127,6 +129,7 @@ class Puck extends GetxController {
           case BluetoothDeviceState.connected:
             print('🐳🐳connected');
             puck2.value = device;
+            setService(device);
             // Todo ::: 스캔 리스트에서 연결중인 퍽 삭제
             break;
           case BluetoothDeviceState.disconnecting:
@@ -155,5 +158,15 @@ class Puck extends GetxController {
         break;
       default:
     }
+  }
+
+  void setService(BluetoothDevice device) async {
+    List<BluetoothService> services = await device.discoverServices();
+    if (device.name == PUCK1)
+      servicePuck1 = services.firstWhere(
+          (s) => s.uuid.toString().toUpperCase().substring(4, 8) == '4A56');
+    else if (device.name == PUCK2)
+      servicePuck2 = services.firstWhere(
+          (s) => s.uuid.toString().toUpperCase().substring(4, 8) == '4A56');
   }
 }
