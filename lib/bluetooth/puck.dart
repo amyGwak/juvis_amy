@@ -31,14 +31,19 @@ class Puck extends GetxController {
   Rx<BluetoothDeviceState> deviceStatePuck1 =
       Rx<BluetoothDeviceState>(BluetoothDeviceState.disconnected);
   Rx<BluetoothDevice?> puck1 = Rx<BluetoothDevice?>(null);
+
   BluetoothService? servicePuck1;
-  BluetoothCharacteristic? charState1; //0001 특성
-  BluetoothCharacteristic? charFreq1; //0002 주파모드
-  BluetoothCharacteristic? charFreqLevel1; //0003 주파강도
-  BluetoothCharacteristic? blueSensorOn1; //0004 센서on/off
-  BluetoothCharacteristic? blueSensorMode1; //0005 센서모드
-  BluetoothCharacteristic? blueBattery1; //0006 배터리
-  BluetoothCharacteristic? blueMotionErr1; //0007 모션에러
+  Map<String, BluetoothCharacteristic?> charPuck1 = {
+    "0001": null, //state
+    "0002": null, //주파모드
+    "0003": null, //주파강도
+    "0004": null, //센서on/off
+    "0005": null, //센서모드
+    "0006": null, //배터리
+    "0007": null, //모션에러
+  };
+
+  RxList<int> sensorModePuck1 = <int>[].obs;
 
 //PUCK2
 
@@ -50,19 +55,22 @@ class Puck extends GetxController {
       Rx<BluetoothDeviceState>(BluetoothDeviceState.disconnected);
   Rx<BluetoothDevice?> puck2 = Rx<BluetoothDevice?>(null);
   BluetoothService? servicePuck2;
-  BluetoothCharacteristic? charState2; //0001 특성
-  BluetoothCharacteristic? charFreq2; //0002 주파모드
-  BluetoothCharacteristic? charFreqLevel2; //0003 주파강도
-  BluetoothCharacteristic? blueSensorOn2; //0004 센서on/off
-  BluetoothCharacteristic? blueSensorMode2; //0005 센서모드
-  BluetoothCharacteristic? blueBattery2; //0006 배터리
-  BluetoothCharacteristic? blueMotionErr2; //0007 모션에러
+  Map<String, BluetoothCharacteristic?> charUuidPuck2 = {
+    "0001": null, //state
+    "0002": null, //주파모드
+    "0003": null, //주파강도
+    "0004": null, //센서on/off
+    "0005": null, //센서모드
+    "0006": null, //배터리
+    "0007": null, //모션에러
+  };
+
+  RxList<int> sensorModePuck2 = <int>[].obs;
 
   List<String> state = [];
   List<int> frequency = [];
   List<int> frequencyLevel = [];
   int sensorValue = 0;
-  List<int> sensorMode = [];
   bool isSensorOn = false;
   bool isFrequencyOn = false;
   String battery = '0%';
@@ -111,7 +119,7 @@ class Puck extends GetxController {
     if (device.name == PUCK1) {
       deviceStatePuck1.value = BluetoothDeviceState.connecting;
 
-      device.state.listen((state) {
+      device.state.listen((state) async {
         connectStatePuck1.value = state; //puck1의 상태 데이터 저장
         switch (state) {
           case BluetoothDeviceState.connecting:
@@ -122,8 +130,9 @@ class Puck extends GetxController {
             print('🔥🔥connected');
             deviceStatePuck1.value = BluetoothDeviceState.connected;
             puck1.value = device;
-            setService(device);
             // Todo ::: 스캔 리스트에서 연결중인 퍽 삭제
+            var service = await setService(device);
+            setCharacterList(device, service);
             break;
           case BluetoothDeviceState.disconnecting:
             print('🔥🔥disconnecting');
@@ -176,13 +185,34 @@ class Puck extends GetxController {
     device.disconnect();
   }
 
-  void setService(BluetoothDevice device) async {
+  Future<BluetoothService> setService(BluetoothDevice device) async {
     List<BluetoothService> services = await device.discoverServices();
+
+    BluetoothService loopCoreService = services.firstWhere(
+        (s) => s.uuid.toString().toUpperCase().substring(4, 8) == '4A56');
+    print('🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥');
+    print(loopCoreService);
+
     if (device.name == PUCK1)
-      servicePuck1 = services.firstWhere(
-          (s) => s.uuid.toString().toUpperCase().substring(4, 8) == '4A56');
-    else if (device.name == PUCK2)
-      servicePuck2 = services.firstWhere(
-          (s) => s.uuid.toString().toUpperCase().substring(4, 8) == '4A56');
+      servicePuck1 = loopCoreService;
+    else if (device.name == PUCK2) servicePuck2 = loopCoreService;
+
+    return loopCoreService;
+  }
+
+  setCharacterList(BluetoothDevice device, BluetoothService service) async {
+    List<BluetoothCharacteristic> charList = service.characteristics;
+
+    for (int i = 0; i < charList.length; i++) {
+      String uuid = charList[i].uuid.toString().toUpperCase().substring(4, 8);
+      BluetoothCharacteristic characteristic = charList[i];
+      print('🐳🐳🐳🐳🐳🐳🐳🐳');
+      print(characteristic);
+      if (device.name == PUCK1) {
+        charPuck1[uuid] = characteristic;
+      } else if (device.name == PUCK2) {
+        charUuidPuck2[uuid] = characteristic;
+      }
+    }
   }
 }
