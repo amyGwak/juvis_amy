@@ -1,10 +1,12 @@
 import 'dart:ffi';
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:async';
 import '../bluetooth/puck1.dart';
 import '../bluetooth/puck2.dart';
 import '../popup.dart';
+import 'exVideo.dart';
 
 
 Puck1 puck1 = Puck1();
@@ -22,11 +24,7 @@ class _Measure extends State<Measure> {
   late Duration currentPosition;
   int currentVideoOrder = 0;
   int currentCount = 0;
-  bool puckConnected = false;
   bool _visible = true;
-  bool isFullScreen = false;
-  bool isCurrentVideoEnd = false;
-  bool isPlayStarted = false;
   List<String> painPointList = ["어깨 통증", "팔이 두둑거림", "날개뼈 통증", "어지러움", "허리 통증"];
 
 
@@ -80,18 +78,11 @@ class _Measure extends State<Measure> {
     if(mounted && streamUrl.isNotEmpty) {
       _initController(0).then((_) {
         _playController(0);
-
-        _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-          setState((){
-            if(_controller(currentVideoOrder).value.isPlaying || _humanController(currentVideoOrder).value.isPlaying) {
-              currentCount++;
-            }
-          });
-        });
+        setTimer();
       });
     }
 
-    if(streamUrl.length > 1) {
+    if(mounted && streamUrl.length > 1) {
       _initController(1).whenComplete(() => _lock = false);
     }
 
@@ -111,6 +102,35 @@ class _Measure extends State<Measure> {
     _controller(currentVideoOrder).dispose();
     _timer.cancel();
     super.dispose();
+  }
+
+  void playHandler () {
+    var controller = isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder);
+    if(controller.value.isPlaying) {
+      controller.pause();
+      _timer.cancel();
+      _visible = true;
+    } else {
+      controller.play();
+      setState((){
+        _visible = false;
+        if(!_timer.isActive){
+          setTimer();
+        }
+      });
+    }
+
+  }
+
+  void setTimer () {
+    _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      var controller = isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder);
+      setState((){
+        if(controller.value.isPlaying) {
+          currentCount++;
+        }
+      });
+    });
   }
 
   VideoPlayerController _controller(int index) {
@@ -147,7 +167,6 @@ class _Measure extends State<Measure> {
         if(index < streamUrl.length - 1) {
           // 영상이 마지막 영상이 아닐때, 다음 비디오로 넘어간다.
           _nextVideo();
-          // currentCount = 0;
         } else {
           // 마지막 영상이면 운동 완료 페이지로 이동시켜줘야 함
         }
@@ -224,6 +243,8 @@ class _Measure extends State<Measure> {
 
   }
 
+
+
   void _nextVideo () async {
     if(_lock || currentVideoOrder == streamUrl.length - 1) {
       //마지막 비디오라면
@@ -249,7 +270,7 @@ class _Measure extends State<Measure> {
     }
   }
 
-  Future<void> changeVideo() async {
+  void changeVideo() {
 
     if(isHumanCountMode) {
       _humanController(currentVideoOrder).pause();
@@ -258,9 +279,12 @@ class _Measure extends State<Measure> {
       _controller(currentVideoOrder).seekTo(currentPosition);
       setState((){});
       _controller(currentVideoOrder).play();
+
     } else {
+
       _controller(currentVideoOrder).pause();
       currentPosition = _controller(currentVideoOrder).value.position;
+
       _humanController(currentVideoOrder).seekTo(currentPosition);
       setState((){});
       _humanController(currentVideoOrder).play();
@@ -274,7 +298,15 @@ class _Measure extends State<Measure> {
   }
 
 
-  void _toggle(){
+  VideoPlayerController getController () {
+    if(isHumanCountMode) {
+      return _humanController(currentVideoOrder);
+    } else {
+      return _controller(currentVideoOrder);
+    }
+  }
+
+void _toggle(){
     setState((){
       _visible = !_visible;
     });
@@ -364,127 +396,131 @@ class _Measure extends State<Measure> {
           padding: const EdgeInsets.only(bottom: 70),
           child: Center(
             child: Column(
-              children: [
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Column(
-                      children: [
-                        GestureDetector(
-                          onTap: (){
-                            _toggle();
-                          },
-                          child: Stack(
-                            children: [
-                              isFullScreen ?
-                              RotatedBox(
-                                quarterTurns: 1,
-                                child: AspectRatio(
-                                  aspectRatio: isHumanCountMode ? _humanController(currentVideoOrder).value.aspectRatio : _controller(currentVideoOrder).value.aspectRatio,
-                                  child: Container(
-                                    height: 100,
-                                      color: Colors.black,
-                                      child: isHumanCountMode ? VideoPlayer(_humanController(currentVideoOrder)) : VideoPlayer(_controller(currentVideoOrder))),
-                                ),
-                              ) :
-                              AspectRatio(
-                                aspectRatio: isHumanCountMode ? _humanController(currentVideoOrder).value.aspectRatio : _controller(currentVideoOrder).value.aspectRatio,
-                                child: Container(
-                                    height: 100,
-                                    color: Colors.black,
-                                    child: isHumanCountMode ? VideoPlayer(_humanController(currentVideoOrder)) : VideoPlayer(_controller(currentVideoOrder))),
-                              ),
-                            ]
-                          ),
-                        ),
-                          VideoProgressIndicator(
-                              isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder),
-                              allowScrubbing: false,
-                          ),
-                        // Text("$position", textAlign: TextAlign.start),
-                          ValueListenableBuilder(
-                            valueListenable:isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder),
-                            builder: (context, VideoPlayerValue value, child) {
-                              //Do Something with the value.
-                              return Text(value.position.toString().split('.')[0]);
-                            },
-                          ),
-                      ]
-                    ),
-
-                    Center(
-                      child: Visibility(
-                        visible: _visible,
-                        child: CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Colors.white60,
-                          child: IconButton(
-                            onPressed: (){
-                              if(_controller(currentVideoOrder).value.isPlaying || _humanController(currentVideoOrder).value.isPlaying) {
-
-                                if(isHumanCountMode) {
-                                  _humanController(currentVideoOrder).pause();
-                                } else {
-                                  _controller(currentVideoOrder).pause();
-                                }
-                                _timer.cancel();
-                                _visible = true;
-                              } else {
-                                if(isHumanCountMode) {
-                                  _humanController(currentVideoOrder).play();
-                                } else {
-                                  _controller(currentVideoOrder).play();
-                                }
-
-                                setState((){
-                                  _visible = false;
-                                  if(!_timer.isActive){
-                                    _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-                                      setState((){
-                                        currentCount++;
-                                      });
-                                    });
-                                  }
-                                });
-                              }
-                            },
-                            icon: Icon(
-                                _controller(currentVideoOrder).value.isPlaying == true ? Icons.pause : Icons.play_arrow,
-                                size: 20,
-                                color: Colors.blue),
-                          )
-
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    top: 30,
-                    right: 0,
-                    child: IconButton(
-                      icon: const Icon(Icons.fullscreen),
-                      color: Colors.white,
-                      iconSize: 25,
-                      onPressed: (){
-                        //full screen horizontal
-                        setState((){
-                          isFullScreen = !isFullScreen;
-                        });
-                      },
-                    ),
-                  ),
-                  Positioned(
-                    top: 70,
-                    right: 0,
-                    child: Switch(
-                      activeColor: Colors.red,
-                      value: isHumanCountMode,
-                      onChanged: (bool value) {
-                        changeVideo();
-                      },
-                    ),
-                  ),
-                ]
+              children: <Widget>[
+                ExVideo(controller: getController(), changeVideo: changeVideo,
+                    isHumanCountMode: isHumanCountMode, visible: _visible, playHandler: playHandler,
+                    toggle: _toggle,
                 ),
+                // Stack(
+                //   alignment: Alignment.center,
+                //   children: [
+                //     Column(
+                //       children: [
+                //         GestureDetector(
+                //           onTap: (){
+                //             _toggle();
+                //           },
+                //           child: Stack(
+                //             children: [
+                //               isFullScreen ?
+                //               RotatedBox(
+                //                 quarterTurns: 1,
+                //                 child: AspectRatio(
+                //                   aspectRatio: isHumanCountMode ? _humanController(currentVideoOrder).value.aspectRatio : _controller(currentVideoOrder).value.aspectRatio,
+                //                   child: Container(
+                //                     height: 100,
+                //                       color: Colors.black,
+                //                       child: isHumanCountMode ? VideoPlayer(_humanController(currentVideoOrder)) : VideoPlayer(_controller(currentVideoOrder))),
+                //                 ),
+                //               ) :
+                //               AspectRatio(
+                //                 aspectRatio: isHumanCountMode ? _humanController(currentVideoOrder).value.aspectRatio : _controller(currentVideoOrder).value.aspectRatio,
+                //                 child: Container(
+                //                     height: 100,
+                //                     color: Colors.black,
+                //                     child: isHumanCountMode ? VideoPlayer(_humanController(currentVideoOrder)) : VideoPlayer(_controller(currentVideoOrder))),
+                //               ),
+                //             ]
+                //           ),
+                //         ),
+                //           VideoProgressIndicator(
+                //               isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder),
+                //               allowScrubbing: false,
+                //           ),
+                //         // Text("$position", textAlign: TextAlign.start),
+                //           ValueListenableBuilder(
+                //             valueListenable:isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder),
+                //             builder: (context, VideoPlayerValue value, child) {
+                //               //Do Something with the value.
+                //               return Text(value.position.toString().split('.')[0]);
+                //             },
+                //           ),
+                //       ]
+                //     ),
+                //
+                //     Center(
+                //       child: Visibility(
+                //         visible: _visible,
+                //         child: CircleAvatar(
+                //           radius: 20,
+                //           backgroundColor: Colors.white60,
+                //           child: IconButton(
+                //             onPressed: (){
+                //               if(_controller(currentVideoOrder).value.isPlaying || _humanController(currentVideoOrder).value.isPlaying) {
+                //
+                //                 if(isHumanCountMode) {
+                //                   _humanController(currentVideoOrder).pause();
+                //                 } else {
+                //                   _controller(currentVideoOrder).pause();
+                //                 }
+                //                 _timer.cancel();
+                //                 _visible = true;
+                //               } else {
+                //                 if(isHumanCountMode) {
+                //                   _humanController(currentVideoOrder).play();
+                //                 } else {
+                //                   _controller(currentVideoOrder).play();
+                //                 }
+                //
+                //                 setState((){
+                //                   _visible = false;
+                //                   if(!_timer.isActive){
+                //                     _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
+                //                       setState((){
+                //                         currentCount++;
+                //                       });
+                //                     });
+                //                   }
+                //                 });
+                //               }
+                //             },
+                //             icon: Icon(
+                //                 _controller(currentVideoOrder).value.isPlaying == true ? Icons.pause : Icons.play_arrow,
+                //                 size: 20,
+                //                 color: Colors.blue),
+                //           )
+                //
+                //         ),
+                //       ),
+                //     ),
+                //   Positioned(
+                //     top: 30,
+                //     right: 0,
+                //     child: IconButton(
+                //       icon: const Icon(Icons.fullscreen),
+                //       color: Colors.white,
+                //       iconSize: 25,
+                //       onPressed: (){
+                //         //full screen horizontal
+                //         setState((){
+                //           isFullScreen = !isFullScreen;
+                //         });
+                //       },
+                //     ),
+                //   ),
+                //   Positioned(
+                //     top: 70,
+                //     right: 0,
+                //     child: Switch(
+                //       activeColor: Colors.red,
+                //       value: isHumanCountMode,
+                //       onChanged: (bool value) {
+                //         changeVideo();
+                //       },
+                //     ),
+                //   ),
+                // ]
+                // ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
