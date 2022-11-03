@@ -112,7 +112,52 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                       if (puck.deviceStatePuck1.value ==
                           BluetoothDeviceState.connected)
                         Column(
-                          children: [],
+                          children: [
+                            ElevatedButton(
+                                onPressed: () {
+                                  puck.setSensorOnOff(
+                                      true, true, puck.puck1.value!);
+
+                                  puck.read('0004', puck.puck1.value!);
+                                },
+                                child: Text('주파on/센서on')),
+                            ElevatedButton(
+                                onPressed: () {
+                                  puck.setSensorOnOff(
+                                      false, false, puck.puck1.value!);
+
+                                  puck.read('0004', puck.puck1.value!);
+                                },
+                                child: Text('주파off/센서off')),
+                            ElevatedButton(
+                                onPressed: () {
+                                  puck.notify('0005', puck.puck1.value!, true);
+                                },
+                                child: Text('센서모드 on')),
+                            ElevatedButton(
+                                onPressed: () {
+                                  puck.notify('0005', puck.puck1.value!, false);
+                                },
+                                child: Text('센서모드 off')),
+                            ElevatedButton(
+                                onPressed: () {
+                                  puck.setFrequencyMode(
+                                      1, 60, puck.puck1.value!);
+                                },
+                                child: Text('주파모드 설정')),
+                            ElevatedButton(
+                                onPressed: () {
+                                  puck.setFrequencyIntensity(
+                                      16, puck.puck1.value!);
+                                },
+                                child: Text('주파강도-16')),
+                            ElevatedButton(
+                                onPressed: () {
+                                  puck.setFrequencyIntensity(
+                                      0, puck.puck1.value!);
+                                },
+                                child: Text('주파강도-0'))
+                          ],
                         ),
 
                       //PUCK2
@@ -132,7 +177,20 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                       if (puck.deviceStatePuck2.value ==
                           BluetoothDeviceState.connected)
                         Column(
-                          children: [],
+                          children: [
+                            ElevatedButton(
+                                onPressed: () {
+                                  puck.setSensorOnOff(
+                                      true, true, puck.puck2.value!);
+                                },
+                                child: Text('주파on/센서on')),
+                            ElevatedButton(
+                                onPressed: () {
+                                  puck.setSensorOnOff(
+                                      false, false, puck.puck2.value!);
+                                },
+                                child: Text('주파off/센서off'))
+                          ],
                         ),
                       Heading(title: '연결 가능한 기기'),
                       SizedBox(

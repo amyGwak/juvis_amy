@@ -55,7 +55,7 @@ class Puck extends GetxController {
       Rx<BluetoothDeviceState>(BluetoothDeviceState.disconnected);
   Rx<BluetoothDevice?> puck2 = Rx<BluetoothDevice?>(null);
   BluetoothService? servicePuck2;
-  Map<String, BluetoothCharacteristic?> charUuidPuck2 = {
+  Map<String, BluetoothCharacteristic?> charPuck2 = {
     "0001": null, //state
     "0002": null, //주파모드
     "0003": null, //주파강도
@@ -132,7 +132,7 @@ class Puck extends GetxController {
             puck1.value = device;
             // Todo ::: 스캔 리스트에서 연결중인 퍽 삭제
             var service = await setService(device);
-            setCharacterList(device, service);
+            await setCharacterList(device, service);
             break;
           case BluetoothDeviceState.disconnecting:
             print('🔥🔥disconnecting');
@@ -211,8 +211,78 @@ class Puck extends GetxController {
       if (device.name == PUCK1) {
         charPuck1[uuid] = characteristic;
       } else if (device.name == PUCK2) {
-        charUuidPuck2[uuid] = characteristic;
+        charPuck2[uuid] = characteristic;
       }
+      print(charPuck1[uuid]);
     }
+  }
+
+  setSensorOnOff(bool frequency, bool sensor, BluetoothDevice device) async {
+    BluetoothCharacteristic? _char = _deviceToCharList(device)['0004'];
+
+    print(_char);
+
+    if (_char == null || _char.properties.write == false) return;
+
+    print('🔥🔥🔥🔥');
+
+    if (frequency == true && sensor == true) {
+      await _char.write([17]);
+    } else if (frequency == true && sensor == false) {
+      await _char.write([16]);
+    } else if (frequency == false && sensor == true) {
+      await _char.write([1]);
+    } else if (frequency == false && sensor == false) {
+      await _char.write([0]);
+    }
+  }
+
+  setFrequencyMode(int mode, int seconds, BluetoothDevice device) async {
+    BluetoothCharacteristic? _char = _deviceToCharList(device)['0002'];
+    if (_char == null || _char.properties.write == false) return;
+
+    await _char.write([mode, seconds]);
+    read('0002', device);
+  }
+
+  setFrequencyIntensity(int intensity, BluetoothDevice device) async {
+    BluetoothCharacteristic? _char = _deviceToCharList(device)['0003'];
+    if (_char == null || _char.properties.write == false) return;
+
+    await _char.write([intensity]);
+    read('0003', device);
+  }
+
+  read(String charKey, BluetoothDevice device) async {
+    BluetoothCharacteristic? _char = _deviceToCharList(device)[charKey];
+
+    if (_char == null || _char.properties.read == false) return;
+
+    List<int> result = await _char.read();
+
+    print(result);
+    return result;
+  }
+
+  notify(String charKey, BluetoothDevice device, bool toogle) async {
+    BluetoothCharacteristic? _char = _deviceToCharList(device)[charKey];
+
+    if (_char == null || _char.properties.notify == false) return;
+
+    await _char.setNotifyValue(toogle);
+
+    if (toogle == true) {
+      _char.value.listen((event) {
+        print(event);
+      });
+    }
+  }
+
+  Map<String, BluetoothCharacteristic?> _deviceToCharList(
+      BluetoothDevice device) {
+    if (device.name == PUCK1)
+      return charPuck1;
+    else
+      return charPuck2;
   }
 }
