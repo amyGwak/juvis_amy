@@ -99,6 +99,12 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                           title: Text(puck
                               .getTranslatedDeviceName(puck.puck1.value!.name)),
                           subtitle: Text(puck.connectStatePuck1.toString()),
+                          trailing: GestureDetector(
+                            child: Icon(Icons.close),
+                            onTap: () {
+                              puck.disconnectDevice(puck.puck1.value!);
+                            },
+                          ),
                         ),
                       if (puck.puck2.value != null)
                         ListTile(
@@ -106,6 +112,12 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                           title: Text(puck
                               .getTranslatedDeviceName(puck.puck2.value!.name)),
                           subtitle: Text(puck.connectStatePuck2.toString()),
+                          trailing: GestureDetector(
+                            child: Icon(Icons.close),
+                            onTap: () {
+                              puck.disconnectDevice(puck.puck2.value!);
+                            },
+                          ),
                         ),
                       Heading(title: '연결 가능한 기기'),
                       SizedBox(

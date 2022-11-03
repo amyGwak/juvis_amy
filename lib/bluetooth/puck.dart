@@ -99,15 +99,19 @@ class Puck extends GetxController {
         connectStatePuck1.value = state; //puck1의 상태 데이터 저장
         switch (state) {
           case BluetoothDeviceState.connecting:
+            print('🔥🔥connecting');
+            puck1.value = device;
+            break;
+          case BluetoothDeviceState.connected:
+            print('🔥🔥connected');
             puck1.value = device;
             // Todo ::: 스캔 리스트에서 연결중인 퍽 삭제
             break;
-          case BluetoothDeviceState.disconnected:
-            puck1.value = null;
-            // Todo ::: puck1 연결해제 따로 해줘야할까?
+          case BluetoothDeviceState.disconnecting:
+            print('🔥🔥disconnecting');
             break;
-          case BluetoothDeviceState.connected:
-            puck1.value = device;
+          case BluetoothDeviceState.disconnected:
+            print('🔥🔥disconnected');
             break;
           default:
         }
@@ -117,19 +121,39 @@ class Puck extends GetxController {
         connectStatePuck2.value = state; //puck1의 상태 데이터 저장
         switch (state) {
           case BluetoothDeviceState.connecting:
+            print('🐳🐳connecting');
+            puck2.value = device;
+            break;
+          case BluetoothDeviceState.connected:
+            print('🐳🐳connected');
             puck2.value = device;
             // Todo ::: 스캔 리스트에서 연결중인 퍽 삭제
             break;
-          case BluetoothDeviceState.disconnected:
-            puck2.value = null;
-            // Todo ::: puck2 연결해제 따로 해줘야할까?
+          case BluetoothDeviceState.disconnecting:
+            print('🐳🐳disconnecting');
             break;
-          case BluetoothDeviceState.connected:
-            puck2.value = device;
+          case BluetoothDeviceState.disconnected:
+            print('🐳🐳disconnected');
             break;
           default:
         }
       });
+    }
+  }
+
+  void disconnectDevice(BluetoothDevice device) {
+    device.disconnect();
+
+    switch (device.name) {
+      case PUCK1:
+        puck1.value = null;
+        connectStatePuck1.value = null;
+        break;
+      case PUCK2:
+        puck2.value = null;
+        connectStatePuck2.value = null;
+        break;
+      default:
     }
   }
 }
