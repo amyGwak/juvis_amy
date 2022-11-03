@@ -43,7 +43,7 @@ class Puck extends GetxController {
     "0007": null, //모션에러
   };
 
-  RxList<int> sensorModePuck1 = <int>[].obs;
+  RxList<List<int>> sensorModePuck1 = RxList<List<int>>([]);
 
 //PUCK2
 
@@ -65,15 +65,7 @@ class Puck extends GetxController {
     "0007": null, //모션에러
   };
 
-  RxList<int> sensorModePuck2 = <int>[].obs;
-
-  List<String> state = [];
-  List<int> frequency = [];
-  List<int> frequencyLevel = [];
-  int sensorValue = 0;
-  bool isSensorOn = false;
-  bool isFrequencyOn = false;
-  String battery = '0%';
+  RxList<List<int>> sensorModePuck2 = RxList<List<int>>([]);
 
   Future<List> scan() async {
     scanning.value = true;
@@ -273,7 +265,15 @@ class Puck extends GetxController {
 
     if (toogle == true) {
       _char.value.listen((event) {
-        print(event);
+        if (charKey == '0005') {
+          if (device.name == PUCK1) {
+            sensorModePuck1.value.add(event);
+            print(
+                '${sensorModePuck1.value.length - 1} : ${sensorModePuck1.value[sensorModePuck1.length - 1]} : ${event}');
+          } else if (device.name == PUCK2) {
+            sensorModePuck2.value.add(event);
+          }
+        }
       });
     }
   }
