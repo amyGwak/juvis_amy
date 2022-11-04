@@ -27,18 +27,14 @@ class _Measure extends State<Measure> {
   bool _visible = true;
   List<String> painPointList = ["어깨 통증", "팔이 두둑거림", "날개뼈 통증", "어지러움", "허리 통증"];
 
+  bool isMetronomeMode = false;
 
-  bool isHumanCountMode = false;
+  String curMode = "ex";
+  String prevMode = "";
 
   //영상 관련
   final Map<String, VideoPlayerController> _controllers = {};
-  final Map<int, VoidCallback> _listeners = {};
-
-  final Map<String, VideoPlayerController> _humanControllers = {};
-  final Map<int, VoidCallback> _humanListeners = {};
-
-
-
+  final Map<String, VideoPlayerController> _metronomeControllers = {};
 
   bool _lock = true;
   late Timer _timer;
@@ -46,17 +42,17 @@ class _Measure extends State<Measure> {
   // 운동 영상
   Set<String> streamUrl = {
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
+    "https://amytest2.s3.ap-northeast-2.amazonaws.com/5%E1%84%8E%E1%85%A9.mp4"
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
+    "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/5%E1%84%8E%E1%85%A9.mp4",
   };
 
   // 본운동(human count 영상)
-  Set<String> humanCountUrl = {
+  Set<String> metronomeUrl = {
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4",
+    "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4",
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/5%E1%84%8E%E1%85%A9.mp4",
   };
@@ -65,41 +61,52 @@ class _Measure extends State<Measure> {
   // 본 운동이 싫으면 언제든지 대체 가능해야 한다. 이거는 지금 changeVideo 처럼 하면 된다.
 
   String alterUrl = "https://amytest2.s3.ap-northeast-2.amazonaws.com/alter.mp4";
-  late VideoPlayerController alterController;
+  late VideoPlayerController _alterController;
   late VoidCallback _alterListeners;
-  // 대체 영상이 종료 되면 currentVideoOrder++, break 영상으로 넘어간다. 그리고 본 운동의 human / default mode에 따라 controller(currentVideoOrder)로 바꿔준다.
 
-  // break 영상 1개
-  // break 영상은 무조건 본 운동 사이에 나와야 함!
-  // 영상1 - break - 영상2 - break - 영상3 - break - 영상4 - break - 영상5 - break - 영상6 - break - 영상7 - break - 영상8 - break - 영상9
+
   String breakUrl = "https://amytest2.s3.ap-northeast-2.amazonaws.com/break.mp4";
-  late VideoPlayerController breakController;
+  late VideoPlayerController _breakController;
   late VoidCallback _breakListeners;
-  // 본운동이 종료되면, break 영상이 들어온다. 그리고 본 운동의 mode에 따라 다음 영상을 틀어준다.
 
 
-  List<int> videoOrder = [];
+  //Todo: 1) 순서 나열(api 요청 포함), 2) 함수는 목적별로 분리, 3) 분기 타야하는 것들은 어쩔 수 없어, 4) 모드는 2개(isMetronome T/F)
+
+
+  // 영상 재생 순서
+
+  // initController (20개 컨트롤러 준비) - 모든 controller 전부
+  // listenController (준비된 컨트롤러에 listener 구독) - controller 별로 다르다. 다음 영상 준비 함수 필
+  // playController (재생시킨다) - play()만
+  // stopController (중지됬을 때) - pause(), 리스너 구독을 여기서 해제할 필요 있나? 삭제하면..?
+  // removeController (재생이 끝난 -2번째 비디오를 삭제한다) - 두번째 영상전꺼를 아예 controllers에서 삭제, dispose
+  // reset 하는 함수 ( 모든 controller dispose, 최상위 dispose에서 )
+
+
+
+  // Map<String, Map<String, String>> controllers = {
+  //   "ex": { "url1": "111","url2": "222" },
+  //   "ex2": { "url2": "333" },
+  //   "alter": { "url": "444" },
+  //   "break": { "url": "555" }
+  // };
+
+
+
 
 
   @override
   void initState() {
     super.initState();
 
-    // Future.delayed(const Duration(milliseconds: 100));
-
     if(mounted && streamUrl.isNotEmpty) {
-      _initController(0).then((_) {
+      _initFirstController().then((_) {
+        // listenController()
         _playController(0);
-        setTimer();
+        _initNextController(1).whenComplete(() => _lock = false);
+        startTimer();
       });
     }
-
-    if(mounted && streamUrl.length > 1) {
-      _initController(1).whenComplete(() => _lock = false);
-    }
-
-    videoOrder = List<int>.generate(streamUrl.length + 1, (i) => i + 1);
-
   }
 
   @override
@@ -110,14 +117,37 @@ class _Measure extends State<Measure> {
   @override
   void dispose() {
     // 마지막 controller와 그 이전 controller 지워주기
-    _humanController(currentVideoOrder).dispose();
+    _metronomeController(currentVideoOrder).dispose();
     _controller(currentVideoOrder).dispose();
+    _breakController.dispose();
+    _alterController.dispose();
     _timer.cancel();
+
     super.dispose();
   }
 
+  /// 대체 영상과 break 영상은 지금 본 운동 종류가 뭐냐에 따라 복귀하는 영상이 달라진다.
+  /// 즉 본 운동 모드와 대체/break 영상의 depth는 다를것이다.
+
+  VideoPlayerController getCurrentController (curMode) {
+    switch (curMode) {
+      case "ex":
+        return _controller(currentVideoOrder);
+      case "humanCount":
+        return _metronomeController(currentVideoOrder);
+      case "alter":
+        return _alterController;
+      case "break":
+        return _breakController;
+      default:
+        return _controller(currentVideoOrder);
+    }
+  }
+
+
   void playHandler () {
-    var controller = isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder);
+    var controller = getCurrentController(curMode);
+
     if(controller.value.isPlaying) {
       controller.pause();
       _timer.cancel();
@@ -127,16 +157,16 @@ class _Measure extends State<Measure> {
       setState((){
         _visible = false;
         if(!_timer.isActive){
-          setTimer();
+          startTimer();
         }
       });
     }
 
   }
 
-  void setTimer () {
+  void startTimer () {
     _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      var controller = isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder);
+      var controller = isMetronomeMode ? _metronomeController(currentVideoOrder) : _controller(currentVideoOrder);
       setState((){
         if(controller.value.isPlaying) {
           currentCount++;
@@ -149,120 +179,169 @@ class _Measure extends State<Measure> {
     return _controllers[streamUrl.elementAt(index)]!;
   }
 
-  VideoPlayerController _humanController(int index) {
-    return _humanControllers[humanCountUrl.elementAt(index)]!;
+  VideoPlayerController _metronomeController(int index) {
+    return _metronomeControllers[metronomeUrl.elementAt(index)]!;
   }
 
-  VoidCallback _listenerSpawner(index) {
+  VoidCallback _listenerSpawner() {
     return () {
+
+      var controller = getCurrentController(curMode);
+
       int? duration;
       int? position;
 
-      if(isHumanCountMode) {
-        duration = _humanController(index).value.duration.inSeconds;
-        position = _humanController(index).value.position.inSeconds;
-      } else {
-        duration = _controller(index).value.duration.inSeconds;
-        position = _controller(index).value.position.inSeconds;
-      }
+      duration = controller.value.duration.inSeconds;
+      position = controller.value.position.inSeconds;
+      int gap = (duration - position);
 
 
-      setState((){
-        if(duration! <= position!) {
-          // 운동 영상이 종료되면,
-          return;
-        }
-      });
+      print("!!!!!!gap ${gap}");
 
       if(duration - position < 1) {
-        // 0 이거나 음수일 때 = 아직 영상이 종료되지 않음
-        if(index < streamUrl.length - 1) {
+        // 0 이거나 음수일 때 = 영상 재생 중일 때
+        if(currentVideoOrder < streamUrl.length - 1) {
           // 영상이 마지막 영상이 아닐때, 다음 비디오로 넘어간다.
           _nextVideo();
         } else {
           // 마지막 영상이면 운동 완료 페이지로 이동시켜줘야 함
+          // 기획에 따라 재정비
         }
       }
     };
   }
 
+  void _alterListen() {
 
-  Future<void> _initController(int index) async {
-    var controller = VideoPlayerController.network(streamUrl.elementAt(index));
-    var humanController = VideoPlayerController.network(humanCountUrl.elementAt(index));
-    var alterController = VideoPlayerController.network(alterUrl);
-    var breakController = VideoPlayerController.network(breakUrl);
-
-    _controllers[streamUrl.elementAt(index)] = controller;
-    _humanControllers[humanCountUrl.elementAt(index)] = humanController;
-
-    await controller.initialize();
-    await humanController.initialize();
-
-    // 대체영상과 break 영상도 초기화
-    await alterController.initialize();
-    await breakController.initialize();
   }
 
-  // controller 아예 삭제
-  void _removeController(int index) {
-    if(isHumanCountMode) {
-      _humanController(index).dispose();
-      _humanControllers.remove(humanCountUrl.elementAt(index));
-      _humanListeners.remove(index);
-    } else {
-      _controller(index).dispose();
-      _controllers.remove(streamUrl.elementAt(index));
-      _listeners.remove(index);
-    }
+  void _breakListen() {
 
+  }
+
+
+  // 처음에 딱 한번만 초기화(4개 컨트롤러)
+  Future<void> _initFirstController () async {
+    _alterController = VideoPlayerController.network(alterUrl);
+    _breakController = VideoPlayerController.network(breakUrl);
+    _controllers[streamUrl.elementAt(0)] = VideoPlayerController.network(streamUrl.elementAt(0));
+    _metronomeControllers[metronomeUrl.elementAt(0)] = VideoPlayerController.network(metronomeUrl.elementAt(0));
+
+    await _alterController.initialize();
+    await _breakController.initialize();
+    await _controllers[streamUrl.elementAt(0)]?.initialize();
+    await _metronomeControllers[metronomeUrl.elementAt(0)]?.initialize();
+
+  }
+
+  Future<void> _initNextController(int index) async {
+    // index 로 넘어온 것들만 초기화
+    _controllers[streamUrl.elementAt(index)] = VideoPlayerController.network(streamUrl.elementAt(index));
+    _metronomeControllers[metronomeUrl.elementAt(index)] = VideoPlayerController.network(metronomeUrl.elementAt(index));
+
+    await _controllers[streamUrl.elementAt(index)]?.initialize();
+    await _metronomeControllers[metronomeUrl.elementAt(index)]?.initialize();
+  }
+
+
+
+  // controller 아예 삭제
+  void _removeController() {
+    var index = currentVideoOrder - 2;
+    var controller = getCurrentController(curMode);
+
+    switch (curMode) {
+      case "humanCount":
+        controller.dispose();
+        _metronomeControllers.remove(metronomeUrl.elementAt(index));
+        // _humanListeners.remove(index);
+          break;
+      case "ex":
+        controller.dispose();
+        _controllers.remove(streamUrl.elementAt(index));
+        // _listeners.remove(index);
+        break;
+      case "default":
+    }
   }
 
   void _stopController(int index) {
-    if(isHumanCountMode) {
-      _humanController(index).removeListener(_humanListeners[index]!);
-      _humanController(index).pause();
-      _humanController(index).seekTo(Duration.zero);
-    } else {
-      _controller(index).removeListener(_listeners[index]!);
-      _controller(index).pause();
-      _controller(index).seekTo(Duration.zero);
+    var index = currentVideoOrder;
+    var controller = getCurrentController(curMode);
+
+    switch (curMode) {
+      case "ex":
+        // controller.removeListener(_listeners[index]!);
+        controller.pause();
+        controller.seekTo(Duration.zero);
+        break;
+      case "humanCount":
+        // controller.removeListener(_humanListeners[index]!);
+        controller.pause();
+        controller.seekTo(Duration.zero);
+        break;
+      case "alter":
+      case "break":
+      case "default":
+        controller.pause();
+        controller.seekTo(Duration.zero);
+        break;
     }
   }
 
 
   void _playController(int index) async {
 
+    print("?!?!?!");
 
-      if(!_humanListeners.keys.contains(index)) {
-        _humanListeners[index] = _listenerSpawner(index);
-      }
-      _humanController(index).addListener(_humanListeners[index]!);
+    var controller = getCurrentController(curMode);
 
-      if(index != 0 && isHumanCountMode) {
-        await _humanController(index).play();
-        currentCount = 0;
-      }
+    int? duration = controller.value.duration.inSeconds;
+    int? position = controller.value.position.inSeconds;
+
+    print(duration - position);
 
 
+    switch (curMode) {
+      case "humanCount":
+        // if(!_humanListeners.keys.contains(index)) {
+        //   _humanListeners[index] = _listenerSpawner(index);
+        // }
+        // _humanController(index).addListener(_humanListeners[index]!);
 
-      if(!_listeners.keys.contains(index)) {
-        _listeners[index] = _listenerSpawner(index);
-      }
-      _controller(index).addListener(_listeners[index]!);
+        if(index != 0) {
+          await _metronomeController(index).play();
+          currentCount = 0;
+        }
+        break;
+      case "alter":
+        _alterListeners = _alterListen;
+        break;
+      case "break":
+        _breakListeners = _breakListen;
+        break;
+      case "ex":
+      case "default":
+      // if(!_listeners.keys.contains(index)) {
+      //   _listeners[index] = _listenerSpawner(index);
+      // }
+      controller.addListener(_listenerSpawner);
 
-      if(index != 0 && !isHumanCountMode) {
+      if(index != 0) {
         await _controller(index).play();
         currentCount = 0;
       }
+      break;
 
-
+    }
     setState((){});
-
   }
 
+  void listenController () async {
+    // 다음 video 구독하는 리스너 등록
+  }
 
-
+  //Todo: 해당 함수는 다음 영상을 준비 해주는 것만 하기
   void _nextVideo () async {
     if(_lock || currentVideoOrder == streamUrl.length - 1) {
       //마지막 비디오라면
@@ -270,11 +349,14 @@ class _Measure extends State<Measure> {
     }
 
     _lock = true;
+
+
+    //Todo: stop & remove 를 묶는 함수를 만들어서 nextVideo 전에 호출
     _stopController(currentVideoOrder);
 
     if(currentVideoOrder >= 2) {
-      //첫번째, 두번째 비디오빼고, 뒤에서 세번째 비디오부터 지운다.
-      _removeController(currentVideoOrder - 2);
+      // 첫번째, 두번째 비디오빼고, 뒤에서 세번째 비디오부터 지운다.
+      _removeController();
     }
 
     _playController(++currentVideoOrder);
@@ -284,45 +366,79 @@ class _Measure extends State<Measure> {
       _lock = false;
     } else {
       //마지막 비디오 아니면, 다음 비디오 controller 준비한다.
-      _initController(currentVideoOrder + 1).whenComplete(() => _lock = false);
+      // _initController(currentVideoOrder + 1).whenComplete(() => _lock = false);
+    }
+  }
+
+  void removePrevController () {
+
+
+    if(currentVideoOrder == streamUrl.length - 1) {
+
     }
   }
 
   void changeVideo() {
+    //본 운동 카운트 바꾸는 함수
 
-    if(isHumanCountMode) {
-      _humanController(currentVideoOrder).pause();
-      currentPosition = _humanController(currentVideoOrder).value.position;
+    if(curMode == "humanCount") {
+      _metronomeController(currentVideoOrder).pause();
+      currentPosition = _metronomeController(currentVideoOrder).value.position;
 
       _controller(currentVideoOrder).seekTo(currentPosition);
       setState((){});
       _controller(currentVideoOrder).play();
 
     } else {
-
       _controller(currentVideoOrder).pause();
       currentPosition = _controller(currentVideoOrder).value.position;
 
-      _humanController(currentVideoOrder).seekTo(currentPosition);
+      _metronomeController(currentVideoOrder).seekTo(currentPosition);
       setState((){});
-      _humanController(currentVideoOrder).play();
-
+      _metronomeController(currentVideoOrder).play();
     }
 
     setState(() {
-      isHumanCountMode = !isHumanCountMode;
+      curMode = curMode == "ex" ? "humanCount" : "ex";
     });
 
   }
 
 
-  VideoPlayerController getController () {
-    if(isHumanCountMode) {
-      return _humanController(currentVideoOrder);
-    } else {
-      return _controller(currentVideoOrder);
+  void showAlterVideo () {
+
+    print("$curMode curMode!!!!!");
+    // 대체영상 눌렀을 때 토글
+    // 모드 바꾸고 현재 controller 로 재생
+    if(prevMode == "") {
+      prevMode = curMode;
     }
+
+    // 현재 컨트롤러 중지 및 현재 위치 파악
+    var controller = getCurrentController(curMode);
+    controller.pause();
+    currentPosition = controller.value.position;
+
+    if(curMode == "alter") {
+      // 현재 영상이 대체 영상이라면 -> 이전 모드로 바꿔준다. (ex or humanCount)
+      _alterController.pause();
+
+      var controller = getCurrentController(prevMode);
+      controller.seekTo(currentPosition);
+      controller.play();
+      curMode = prevMode;
+      setState((){});
+    } else {
+      // 현재 영상이 본 운동(ex or humanCount)이라면 대체 영상으로 변경한다.
+      //현재 위치 세팅 후, 모드 전환(컨트롤러 변경), 재생
+      curMode = "alter";
+      _alterController.seekTo(currentPosition);
+      _alterController.play();
+      setState((){});
+    }
+
   }
+
 
 void _toggle(){
     setState((){
@@ -407,7 +523,7 @@ void _toggle(){
           Navigator.pop(context);
         }
         ),
-        title: Text("측정"),
+        title: const Text("측정"),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -415,130 +531,11 @@ void _toggle(){
           child: Center(
             child: Column(
               children: <Widget>[
-                ExVideo(controller: getController(), changeVideo: changeVideo,
-                    isHumanCountMode: isHumanCountMode, visible: _visible, playHandler: playHandler,
+                ExVideo(controller: getCurrentController(curMode), changeVideo: changeVideo,
+                    showAlterVideo: showAlterVideo, curMode: curMode, visible: _visible, playHandler: playHandler,
+
                     toggle: _toggle,
                 ),
-                // Stack(
-                //   alignment: Alignment.center,
-                //   children: [
-                //     Column(
-                //       children: [
-                //         GestureDetector(
-                //           onTap: (){
-                //             _toggle();
-                //           },
-                //           child: Stack(
-                //             children: [
-                //               isFullScreen ?
-                //               RotatedBox(
-                //                 quarterTurns: 1,
-                //                 child: AspectRatio(
-                //                   aspectRatio: isHumanCountMode ? _humanController(currentVideoOrder).value.aspectRatio : _controller(currentVideoOrder).value.aspectRatio,
-                //                   child: Container(
-                //                     height: 100,
-                //                       color: Colors.black,
-                //                       child: isHumanCountMode ? VideoPlayer(_humanController(currentVideoOrder)) : VideoPlayer(_controller(currentVideoOrder))),
-                //                 ),
-                //               ) :
-                //               AspectRatio(
-                //                 aspectRatio: isHumanCountMode ? _humanController(currentVideoOrder).value.aspectRatio : _controller(currentVideoOrder).value.aspectRatio,
-                //                 child: Container(
-                //                     height: 100,
-                //                     color: Colors.black,
-                //                     child: isHumanCountMode ? VideoPlayer(_humanController(currentVideoOrder)) : VideoPlayer(_controller(currentVideoOrder))),
-                //               ),
-                //             ]
-                //           ),
-                //         ),
-                //           VideoProgressIndicator(
-                //               isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder),
-                //               allowScrubbing: false,
-                //           ),
-                //         // Text("$position", textAlign: TextAlign.start),
-                //           ValueListenableBuilder(
-                //             valueListenable:isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder),
-                //             builder: (context, VideoPlayerValue value, child) {
-                //               //Do Something with the value.
-                //               return Text(value.position.toString().split('.')[0]);
-                //             },
-                //           ),
-                //       ]
-                //     ),
-                //
-                //     Center(
-                //       child: Visibility(
-                //         visible: _visible,
-                //         child: CircleAvatar(
-                //           radius: 20,
-                //           backgroundColor: Colors.white60,
-                //           child: IconButton(
-                //             onPressed: (){
-                //               if(_controller(currentVideoOrder).value.isPlaying || _humanController(currentVideoOrder).value.isPlaying) {
-                //
-                //                 if(isHumanCountMode) {
-                //                   _humanController(currentVideoOrder).pause();
-                //                 } else {
-                //                   _controller(currentVideoOrder).pause();
-                //                 }
-                //                 _timer.cancel();
-                //                 _visible = true;
-                //               } else {
-                //                 if(isHumanCountMode) {
-                //                   _humanController(currentVideoOrder).play();
-                //                 } else {
-                //                   _controller(currentVideoOrder).play();
-                //                 }
-                //
-                //                 setState((){
-                //                   _visible = false;
-                //                   if(!_timer.isActive){
-                //                     _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-                //                       setState((){
-                //                         currentCount++;
-                //                       });
-                //                     });
-                //                   }
-                //                 });
-                //               }
-                //             },
-                //             icon: Icon(
-                //                 _controller(currentVideoOrder).value.isPlaying == true ? Icons.pause : Icons.play_arrow,
-                //                 size: 20,
-                //                 color: Colors.blue),
-                //           )
-                //
-                //         ),
-                //       ),
-                //     ),
-                //   Positioned(
-                //     top: 30,
-                //     right: 0,
-                //     child: IconButton(
-                //       icon: const Icon(Icons.fullscreen),
-                //       color: Colors.white,
-                //       iconSize: 25,
-                //       onPressed: (){
-                //         //full screen horizontal
-                //         setState((){
-                //           isFullScreen = !isFullScreen;
-                //         });
-                //       },
-                //     ),
-                //   ),
-                //   Positioned(
-                //     top: 70,
-                //     right: 0,
-                //     child: Switch(
-                //       activeColor: Colors.red,
-                //       value: isHumanCountMode,
-                //       onChanged: (bool value) {
-                //         changeVideo();
-                //       },
-                //     ),
-                //   ),
-                // ]
-                // ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -587,9 +584,9 @@ void _toggle(){
                   ),
                   GestureDetector(
                     onTap: (){
-                      if(isHumanCountMode) {
-                        _humanController(currentVideoOrder).seekTo(Duration.zero);
-                        _humanController(currentVideoOrder).play();
+                      if(isMetronomeMode) {
+                        _metronomeController(currentVideoOrder).seekTo(Duration.zero);
+                        _metronomeController(currentVideoOrder).play();
                       } else {
                         _controller(currentVideoOrder).seekTo(Duration.zero);
                         _controller(currentVideoOrder).play();

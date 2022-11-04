@@ -8,7 +8,8 @@ class ExVideo extends StatefulWidget {
   const ExVideo({super.key,
     required this.controller,
     required this.changeVideo,
-    required this.isHumanCountMode,
+    required this.showAlterVideo,
+    required this.curMode,
     required this.visible,
     required this.playHandler,
     required this.toggle,
@@ -16,17 +17,15 @@ class ExVideo extends StatefulWidget {
 
   final VideoPlayerController controller;
   final VoidCallback changeVideo;
-  final bool isHumanCountMode;
+  final VoidCallback showAlterVideo;
+  final String curMode;
   final bool visible;
   final VoidCallback playHandler;
   final VoidCallback toggle;
 
-
   @override
   _ExVideo createState() => _ExVideo();
-
 }
-
 
 class _ExVideo extends State<ExVideo> {
 
@@ -42,8 +41,6 @@ class _ExVideo extends State<ExVideo> {
   void dispose() {
     super.dispose();
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +132,7 @@ class _ExVideo extends State<ExVideo> {
               right: 0,
               child: Switch(
                 activeColor: Colors.red,
-                value: widget.isHumanCountMode,
+                value: widget.curMode == "humanCount" ? true : false,
                 onChanged: (bool value) {
                   widget.changeVideo();
                 },
@@ -146,9 +143,9 @@ class _ExVideo extends State<ExVideo> {
               right: 0,
               child: Switch(
                 activeColor: Colors.red,
-                value: false,
+                value: widget.curMode == "alter" ? true : false,
                 onChanged: (bool value) {
-                  print("대체 영상 준비");
+                  widget.showAlterVideo();
                 },
               ),
             ),
