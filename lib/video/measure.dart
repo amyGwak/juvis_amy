@@ -56,18 +56,6 @@ class _Measure extends State<Measure> {
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
   };
 
-  // 대체 영상 1개
-  // 본 운동이 싫으면 언제든지 대체 가능해야 한다. 이거는 지금 changeVideo 처럼 하면 된다.
-
-  String alterUrl = "https://amytest2.s3.ap-northeast-2.amazonaws.com/alter.mp4";
-  late VideoPlayerController _alterController;
-  late VoidCallback _alterListeners;
-
-
-  String breakUrl = "https://amytest2.s3.ap-northeast-2.amazonaws.com/break.mp4";
-  late VideoPlayerController _breakController;
-  late VoidCallback _breakListeners;
-
 
   //Todo: 1) 순서 나열(api 요청 포함), 2) 함수는 목적별로 분리, 3) 분기 타야하는 것들은 어쩔 수 없어, 4) 모드는 2개(isMetronome T/F)
 
