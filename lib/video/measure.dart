@@ -7,10 +7,34 @@ import '../bluetooth/puck1.dart';
 import '../bluetooth/puck2.dart';
 import '../popup.dart';
 import 'exVideo.dart';
+import 'package:http/http.dart';
+import 'dart:convert' as convert;
 
 
 Puck1 puck1 = Puck1();
 Puck2 puck2 = Puck2();
+
+class VideoObject {
+  final int uedSeq;
+  final int order;
+  final String uedExDate;
+  final String exCd;
+  final int uepdShowTime;
+  final int uepdExCnt;
+  final int uepdResultKcal;
+  final int uepdQaSeq;
+  final int uepdUserExCnt;
+  final int exSeq;
+  final String exName;
+  final int exKcal;
+  final String exUrl;
+  final String exDesc;
+  final String completeyn;
+
+  VideoObject(this.uedSeq, this.order, this.uedExDate, this.exCd, this.uepdShowTime, this.uepdExCnt, this.uepdResultKcal, this.uepdQaSeq,
+      this.uepdUserExCnt, this.exSeq, this.exName, this.exKcal, this.exUrl, this.exDesc, this.completeyn);
+}
+
 
 class Measure extends StatefulWidget {
   const Measure({Key? key}) : super(key:key);
@@ -21,24 +45,16 @@ class Measure extends StatefulWidget {
 
 class _Measure extends State<Measure> {
 
-  late Duration currentPosition;
   int currentVideoOrder = 0;
-  int currentCount = 0;
+  int currentCount = 1;
   bool _visible = true;
-  List<String> painPointList = ["어깨 통증", "팔이 두둑거림", "날개뼈 통증", "어지러움", "허리 통증"];
-
-  bool isMetronomeMode = false;
-
-  String curMode = "ex";
-  String prevMode = "";
 
   //영상 관련
-  final Map<String, VideoPlayerController> _controllers = {};
+  final Map<int, VideoPlayerController> _controllers = {};
   final Map<int, VoidCallback> _listeners = {};
-  final Map<String, VideoPlayerController> _metronomeControllers = {};
 
   bool _lock = true;
-  late Timer _timer;
+  // late Timer _timer;
 
   // 운동 영상
   Set<String> streamUrl = {
@@ -48,16 +64,8 @@ class _Measure extends State<Measure> {
         "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
   };
 
-  // 본운동(human count 영상)
-  Set<String> metronomeUrl = {
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
-  };
 
 
-  //Todo: 1) 순서 나열(api 요청 포함), 2) 함수는 목적별로 분리, 3) 분기 타야하는 것들은 어쩔 수 없어, 4) 모드는 2개(isMetronome T/F)
 
 
   // 영상 재생 순서
@@ -71,62 +79,173 @@ class _Measure extends State<Measure> {
 
 
 
-  // Map<String, Map<String, String>> controllers = {
-  //   "ex": { "url1": "111","url2": "222" },
-  //   "ex2": { "url2": "333" },
-  //   "alter": { "url": "444" },
-  //   "break": { "url": "555" }
-  // };
-
-
+  // api가 아래처럼 내려온다.
+  List<Map<String, dynamic>> apiVideoList = <Map<String, dynamic>>[
+        {
+          "uedSeq": 1,
+          "order": 0,
+          "uedExDate": "2022-10-25",
+          "exCd": "ready",
+          "uepdShowTime": 0,
+          "uepdExCnt": 5,
+          "uepdResultKcal": 100,
+          "uepdQaSeq": 10,
+          "uepdUserExCnt": 3,
+          "exSeq": 1,
+          "exName": "스쿼트",
+          "exKcal": 20,
+          "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
+          "exDesc": "설명",
+          "completeyn": "Y"
+        },
+        {
+          "uedSeq": 2,
+          "order": 1,
+          "uedExDate": "2022-10-25",
+          "exCd": "break",
+          "uepdShowTime": 0,
+          "uepdExCnt": 5,
+          "uepdResultKcal": 100,
+          "uepdQaSeq": 10,
+          "uepdUserExCnt": 3,
+          "exSeq": 1,
+          "exName": "스쿼트",
+          "exKcal": 20,
+          "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+          "exDesc": "설명",
+          "completeyn": "Y"
+        },
+        {
+        "uedSeq": 1,
+        "order": 2,
+        "uedExDate": "2022-10-25",
+        "exCd": "main",
+        "uepdShowTime": 0,
+        "uepdExCnt": 5,
+        "uepdResultKcal": 100,
+        "uepdQaSeq": 10,
+        "uepdUserExCnt": 3,
+        "exSeq": 1,
+        "exName": "스쿼트",
+        "exKcal": 20,
+        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
+        "exDesc": "설명",
+        "completeyn": "Y"
+      },
+      {
+        "uedSeq": 2,
+        "order": 3,
+        "uedExDate": "2022-10-25",
+        "exCd": "break",
+        "uepdShowTime": 0,
+        "uepdExCnt": 5,
+        "uepdResultKcal": 100,
+        "uepdQaSeq": 10,
+        "uepdUserExCnt": 3,
+        "exSeq": 1,
+        "exName": "스쿼트",
+        "exKcal": 20,
+        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+        "exDesc": "설명",
+        "completeyn": "Y"
+      },
+      {
+        "uedSeq": 1,
+        "order": 4,
+        "uedExDate": "2022-10-25",
+        "exCd": "main",
+        "uepdShowTime": 0,
+        "uepdExCnt": 5,
+        "uepdResultKcal": 100,
+        "uepdQaSeq": 10,
+        "uepdUserExCnt": 3,
+        "exSeq": 1,
+        "exName": "스쿼트",
+        "exKcal": 20,
+        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
+        "exDesc": "설명",
+        "completeyn": "Y"
+      },
+      {
+        "uedSeq": 2,
+        "order": 5,
+        "uedExDate": "2022-10-25",
+        "exCd": "break",
+        "uepdShowTime": 0,
+        "uepdExCnt": 5,
+        "uepdResultKcal": 100,
+        "uepdQaSeq": 10,
+        "uepdUserExCnt": 3,
+        "exSeq": 1,
+        "exName": "스쿼트",
+        "exKcal": 20,
+        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+        "exDesc": "설명",
+        "completeyn": "Y"
+      },
+      {
+        "uedSeq": 1,
+        "order": 6,
+        "uedExDate": "2022-10-25",
+        "exCd": "finish",
+        "uepdShowTime": 0,
+        "uepdExCnt": 5,
+        "uepdResultKcal": 100,
+        "uepdQaSeq": 10,
+        "uepdUserExCnt": 3,
+        "exSeq": 1,
+        "exName": "스쿼트",
+        "exKcal": 20,
+        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4",
+        "exDesc": "설명",
+        "completeyn": "Y"
+      }
+  ];
 
 
 
   @override
   void initState() {
-    super.initState();
+  super.initState();
 
-    if (mounted && streamUrl.length > 0) {
-      _initFirstController().then((_) {
-        _listenController(0);
-        _playController(0);
-        startTimer();
-        _lock = false;
-      });
-    }
 
-    // if (streamUrl.length > 1) {
-    //   _initNextController(1).whenComplete(() => );
-    // }
+  login();
+  if (mounted && apiVideoList.isNotEmpty) {
+    _initFirstController().then((_) {
+    // startTimer();
+      _listenController(0);
+      _playController(0);
+      _lock = false;
+    });
+  }
+
   }
 
   @override
   void deactivate() {
-    super.deactivate();
+  super.deactivate();
   }
 
   @override
   void dispose() {
-    // 마지막 controller와 그 이전 controller 지워주기
-    _controllers[streamUrl.elementAt(currentVideoOrder)]?.dispose();
-    _controllers[streamUrl.elementAt(currentVideoOrder - 1)]?.dispose();
-    _timer.cancel();
+  // 마지막 controller와 그 이전 controller 지워주기
+  _controllers[currentVideoOrder]?.dispose();
+  _controllers[currentVideoOrder - 1]?.dispose();
+  // _timer.cancel();
 
-    super.dispose();
+  super.dispose();
   }
 
-  /// 대체 영상과 break 영상은 지금 본 운동 종류가 뭐냐에 따라 복귀하는 영상이 달라진다.
-  /// 즉 본 운동 모드와 대체/break 영상의 depth는 다를것이다.
 
+  void login () async {
 
-  VideoPlayerController _metronomeController(int index) {
-    return _metronomeControllers[metronomeUrl.elementAt(index)]!;
   }
+
+
 
   VideoPlayerController getCurrentController (index) {
-    return _controllers[streamUrl.elementAt(index)]!;
+    return _controllers[index]!;
   }
-
 
 
   void playHandler () {
@@ -134,30 +253,25 @@ class _Measure extends State<Measure> {
 
     if(controller.value.isPlaying) {
       controller.pause();
-      _timer.cancel();
       _visible = true;
     } else {
       controller.play();
       setState((){
         _visible = false;
-        if(!_timer.isActive){
-          startTimer();
-        }
       });
     }
-
   }
 
-  void startTimer () {
-    _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      var controller =  getCurrentController(currentVideoOrder);
-      setState((){
-        if(controller.value.isPlaying) {
-          currentCount++;
-        }
-      });
-    });
-  }
+  // Future<void> startTimer () async {
+  //   _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
+  //     var controller =  getCurrentController(currentVideoOrder);
+  //     setState((){
+  //       if(controller.value.isPlaying) {
+  //         currentCount++;
+  //       }
+  //     });
+  //   });
+  // }
 
 
 
@@ -173,13 +287,10 @@ class _Measure extends State<Measure> {
       duration = controller.value.duration.inSeconds;
       position = controller.value.position.inSeconds;
 
-      int gap = duration - position;
-
-
       setState((){
-        if(duration! - position! < 2) {
+        if(duration! - position! < 1) {
           // 0 이거나 음수일 때 = 영상 재생 중일 때
-          if(index < streamUrl.length - 1) {
+          if(index < apiVideoList.length - 1) {
             // 영상이 마지막 영상이 아닐때, 다음 비디오로 넘어간다.
             _nextVideo();
           } else {
@@ -194,15 +305,17 @@ class _Measure extends State<Measure> {
 
   // 처음에 딱 한번만 초기화(1개 컨트롤러)
   Future<void> _initFirstController () async {
-    _controllers[streamUrl.elementAt(0)] = VideoPlayerController.network(streamUrl.elementAt(0));
-    await _controllers[streamUrl.elementAt(0)]?.initialize();
+    _controllers[currentVideoOrder] = VideoPlayerController.network(apiVideoList[0]["exUrl"]);
+    await _controllers[currentVideoOrder]?.initialize();
 
   }
 
   Future<void> _initNextController(int index) async {
     // index 로 넘어온 것들만 초기화
-    var controller = VideoPlayerController.network(streamUrl.elementAt(index));
-    _controllers[streamUrl.elementAt(index)] = controller;
+    print("${index} index!!");
+    var controller = VideoPlayerController.network(apiVideoList[index]["exUrl"]);
+    _controllers[index] = controller;
+    print("_controllers[index] ${_controllers[index]}");
     await controller.initialize();
   }
 
@@ -214,7 +327,7 @@ class _Measure extends State<Measure> {
     var controller = getCurrentController(index);
 
       controller.dispose();
-      _controllers.remove(streamUrl.elementAt(index));
+      _controllers.remove(index);
       _listeners.remove(index);
     }
 
@@ -224,7 +337,7 @@ class _Measure extends State<Measure> {
 
     controller.removeListener(_listeners[index]!);
     controller.pause();
-    controller.seekTo(Duration.zero);
+    // controller.seekTo(Duration.zero);
 
   }
 
@@ -242,7 +355,7 @@ class _Measure extends State<Measure> {
 
   //Todo: 해당 함수는 다음 영상을 준비 해주는 것만 하기
   void _nextVideo () async {
-    if(_lock || currentVideoOrder == streamUrl.length - 1) {
+    if(_lock || currentVideoOrder == apiVideoList.length - 1) {
       //마지막 비디오라면
       return;
     }
@@ -250,7 +363,7 @@ class _Measure extends State<Measure> {
     _lock = true;
 
     //Todo: stop & remove 를 묶는 함수를 만들어서 nextVideo 전에 호출
-    _stopController(currentVideoOrder);
+
 
     if(currentVideoOrder >= 2) {
       // 첫번째, 두번째 비디오빼고, 뒤에서 세번째 비디오부터 지운다.
@@ -258,7 +371,7 @@ class _Measure extends State<Measure> {
     }
 
 
-    if(currentVideoOrder == streamUrl.length - 1){
+    if(currentVideoOrder == apiVideoList.length - 1){
       //마지막 비디오면..
       _lock = false;
     } else {
@@ -266,6 +379,7 @@ class _Measure extends State<Measure> {
       await _initNextController(currentVideoOrder + 1);
       await _listenController(currentVideoOrder + 1);
       await _playController(currentVideoOrder + 1);
+
       _lock = false;
 
     }
@@ -276,53 +390,35 @@ class _Measure extends State<Measure> {
 
   }
 
-  void removePrevController () {
-    if(currentVideoOrder == streamUrl.length - 1) {
-      //something happen
-    }
-  }
 
   Future<void> _playController(int index) async {
     var controller = getCurrentController(index);
 
-    setState((){
-      currentCount = 0;
-    });
+    if(index > 0){
+      //1번째 이상 비디오에서 이전 비디오를 중지
+      _stopController(index - 1);
+    }
 
     await controller.play();
+
+
   }
 
-  void changeVideo() {
-    //본 운동 카운트 바꾸는 함수
-    //
-    // if(curMode == "humanCount") {
-    //   _metronomeController(currentVideoOrder).pause();
-    //   currentPosition = _metronomeController(currentVideoOrder).value.position;
-    //
-    //   _controller(currentVideoOrder).seekTo(currentPosition);
-    //   setState((){});
-    //   _controller(currentVideoOrder).play();
-    //
-    // } else {
-    //   _controller(currentVideoOrder).pause();
-    //   currentPosition = _controller(currentVideoOrder).value.position;
-    //
-    //   _metronomeController(currentVideoOrder).seekTo(currentPosition);
-    //   setState((){});
-    //   _metronomeController(currentVideoOrder).play();
-    // }
-    //
-    // setState(() {
-    //   curMode = curMode == "ex" ? "humanCount" : "ex";
-    // });
+  void _toggle(){
+      setState((){
+        _visible = !_visible;
+      });
   }
 
+  int getCount () {
+    var controller = getCurrentController(currentVideoOrder);
+    int position = controller.value.position.inSeconds + 1;
 
-
-void _toggle(){
     setState((){
-      _visible = !_visible;
+      currentCount = position == 0 ? 1 : position % 2 == 0 ? (position / 2).floor() : (position / 2).floor() + 1;
     });
+
+    return currentCount;
   }
 
   void showKeepGoingAlert () {
@@ -410,8 +506,8 @@ void _toggle(){
           child: Center(
             child: Column(
               children: <Widget>[
-                ExVideo(controller: getCurrentController(currentVideoOrder), changeVideo: changeVideo, currentVideoOrder: currentVideoOrder,
-                    curMode: curMode, visible: _visible, playHandler: playHandler,
+                ExVideo(controller: getCurrentController(currentVideoOrder), currentVideoOrder: currentVideoOrder,
+                    visible: _visible, playHandler: playHandler,
                     toggle: _toggle,
                 ),
                 Row(
@@ -438,21 +534,20 @@ void _toggle(){
                           padding: const EdgeInsets.only(top: 20),
                           child: TextButton(
                               onPressed: () {
-                                  print("🌼🌼$i is clicked");
-                                  setState((){
-                                    currentCount = int.parse("$i");
-                                  });
+                                // setState((){
+                                //   currentCount = int.parse("$i");
+                                // });
                               },
                               style: TextButton.styleFrom(
                                   textStyle: const TextStyle(fontSize: 16),
-                                  backgroundColor: currentCount == int.parse("$i") ? Colors.orangeAccent : Colors.transparent,
+                                  backgroundColor:  getCount() == int.parse("$i") ? Colors.orangeAccent : Colors.transparent,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(100), // <-- Radius
                                 ),
                               ),
                                   child: Text("$i",
                                       style: TextStyle(
-                                          color: currentCount == int.parse("$i") ? Colors.black : Colors.grey,
+                                          color:  getCount() == int.parse("$i") ? Colors.black : Colors.grey,
                                       )),
                               ),
                         ),
@@ -462,16 +557,10 @@ void _toggle(){
                   ),
                   GestureDetector(
                     onTap: (){
-                      if(isMetronomeMode) {
-                        _metronomeController(currentVideoOrder).seekTo(Duration.zero);
-                        _metronomeController(currentVideoOrder).play();
-                      } else {
                         getCurrentController(currentVideoOrder).seekTo(Duration.zero);
                         getCurrentController(currentVideoOrder).play();
-                      }
-
                       // 타이머 다시 리셋
-                      currentCount = 0;
+                      // currentCount = 0;
 
                     },
                     child: Row(
@@ -509,31 +598,12 @@ void _toggle(){
                       ]
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 20),
-                    child: Text("진행이 어렵다면?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10.0),
-                    child: ElevatedButton(
-                        onPressed: (){
-                          //modal open
-                          showKeepGoingAlert();
-                        },
-                        child: const Text("진행이 어렵다면 눌러주세요"),
-                        style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.only(right: 10, left: 10),
-                      ),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 25, bottom: 20),
-                    child: Text("지금 아픈 곳이 있나요?",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                        textAlign: TextAlign.start),
-                  ),
+                  // const Padding(
+                  //   padding: EdgeInsets.only(top: 25, bottom: 20),
+                  //   child: Text("지금 아픈 곳이 있나요?",
+                  //       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                  //       textAlign: TextAlign.start),
+                  // ),
                   // SizedBox(
                   //   height: 50,
                   //   child: Row(

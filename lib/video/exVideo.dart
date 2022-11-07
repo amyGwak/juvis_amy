@@ -7,8 +7,6 @@ class ExVideo extends StatefulWidget {
 
   const ExVideo({super.key,
     required this.controller,
-    required this.changeVideo,
-    required this.curMode,
     required this.visible,
     required this.playHandler,
     required this.toggle,
@@ -16,9 +14,6 @@ class ExVideo extends StatefulWidget {
   });
 
   final VideoPlayerController controller;
-  final VoidCallback changeVideo;
-  // final VoidCallback showAlterVideo;
-  final String curMode;
   final bool visible;
   final VoidCallback playHandler;
   final VoidCallback toggle;
@@ -89,7 +84,16 @@ class _ExVideo extends State<ExVideo> {
                     valueListenable: widget.controller,
                     builder: (context, VideoPlayerValue value, child) {
                       //Do Something with the value.
-                      return Text(value.position.toString().split('.')[0]);
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 5.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(value.position.toString().split('.')[0]),
+                            Text(" / ${value.duration.toString().split('.')[0]}")
+                          ],
+                        ),
+                      );
                     },
                   ),
                 ]
@@ -128,28 +132,6 @@ class _ExVideo extends State<ExVideo> {
                 },
               ),
             ),
-            Positioned(
-              top: 70,
-              right: 0,
-              child: Switch(
-                activeColor: Colors.red,
-                value: widget.curMode == "humanCount" ? true : false,
-                onChanged: (bool value) {
-                  widget.changeVideo();
-                },
-              ),
-            ),
-            // Positioned(
-            //   top: 100,
-            //   right: 0,
-            //   child: Switch(
-            //     activeColor: Colors.red,
-            //     value: widget.curMode == "alter" ? true : false,
-            //     onChanged: (bool value) {
-            //       widget.showAlterVideo();
-            //     },
-            //   ),
-            // ),
           ]
     );
   }
