@@ -8,20 +8,21 @@ class ExVideo extends StatefulWidget {
   const ExVideo({super.key,
     required this.controller,
     required this.changeVideo,
-    required this.showAlterVideo,
     required this.curMode,
     required this.visible,
     required this.playHandler,
     required this.toggle,
+    required this.currentVideoOrder,
   });
 
   final VideoPlayerController controller;
   final VoidCallback changeVideo;
-  final VoidCallback showAlterVideo;
+  // final VoidCallback showAlterVideo;
   final String curMode;
   final bool visible;
   final VoidCallback playHandler;
   final VoidCallback toggle;
+  final int currentVideoOrder;
 
   @override
   _ExVideo createState() => _ExVideo();
@@ -138,17 +139,17 @@ class _ExVideo extends State<ExVideo> {
                 },
               ),
             ),
-            Positioned(
-              top: 100,
-              right: 0,
-              child: Switch(
-                activeColor: Colors.red,
-                value: widget.curMode == "alter" ? true : false,
-                onChanged: (bool value) {
-                  widget.showAlterVideo();
-                },
-              ),
-            ),
+            // Positioned(
+            //   top: 100,
+            //   right: 0,
+            //   child: Switch(
+            //     activeColor: Colors.red,
+            //     value: widget.curMode == "alter" ? true : false,
+            //     onChanged: (bool value) {
+            //       widget.showAlterVideo();
+            //     },
+            //   ),
+            // ),
           ]
     );
   }
