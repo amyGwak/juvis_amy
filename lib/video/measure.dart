@@ -3,14 +3,12 @@ import 'dart:ffi';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
-import '../bluetooth/puck1.dart';
-import '../bluetooth/puck2.dart';
 import '../popup.dart';
 import 'exVideo.dart';
-import '/bluetooth/puck.dart';
-import 'package:get/get_state_manager/get_state_manager.dart';
-import 'package:get/state_manager.dart';
+import 'package:juvis_prac/bluetooth/puck.dart';
+import 'package:get/get.dart';
 
 class Measure extends StatefulWidget {
   const Measure({Key? key}) : super(key:key);
@@ -20,11 +18,17 @@ class Measure extends StatefulWidget {
 }
 
 class _Measure extends State<Measure> {
+  final puck = Get.find<Puck>();
+
+  List<List<int>> sensorDataPuck1 = [];
+  List<List<int>> sensorDataPuck2 = [];
+
+  List<Map<String, dynamic>> sensorData = [];
+
 
   int currentVideoOrder = 0;
   int currentCount = 1;
   bool _visible = true;
-  final puck = Get.find<Puck>();
 
   //영상 관련
   final Map<int, VideoPlayerController> _controllers = {};
@@ -32,6 +36,7 @@ class _Measure extends State<Measure> {
 
   bool _lock = true;
 
+  final Map<String, dynamic> sensorCount = {};
 
   // 영상 재생 순서
 
@@ -171,16 +176,19 @@ class _Measure extends State<Measure> {
 
   @override
   void initState() {
-  super.initState();
 
-  if (mounted && apiVideoList.isNotEmpty) {
-    _initFirstController().then((_) {
-    // startTimer();
-      _listenController(0);
-      _playController(0);
-      _lock = false;
-    });
-  }
+    super.initState();
+    sensorDataPuck1 = puck.sensorModePuck1.value;
+    sensorDataPuck2 = puck.sensorModePuck2.value;
+
+    if (mounted && apiVideoList.isNotEmpty) {
+      _initFirstController().then((_) {
+      // startTimer();
+        _listenController(0);
+        _playController(0);
+        _lock = false;
+      });
+    }
 
   }
 
@@ -211,9 +219,15 @@ class _Measure extends State<Measure> {
 
     if(controller.value.isPlaying) {
       controller.pause();
+      puck.notify('0005', puck.puck1.value!, false);
+      puck.notify('0005', puck.puck2.value!, false);
+
       _visible = true;
     } else {
       controller.play();
+      puck.notify('0005', puck.puck1.value!, true);
+      puck.notify('0005', puck.puck2.value!, true);
+
       setState((){
         _visible = false;
       });
@@ -244,6 +258,7 @@ class _Measure extends State<Measure> {
 
       duration = controller.value.duration.inSeconds;
       position = controller.value.position.inSeconds;
+
 
       setState((){
         if(duration! - position! < 1) {
@@ -295,7 +310,9 @@ class _Measure extends State<Measure> {
 
     controller.removeListener(_listeners[index]!);
     controller.pause();
-    // controller.seekTo(Duration.zero);
+
+    puck.notify('0005', puck.puck1.value!, false);
+    puck.notify('0005', puck.puck2.value!, false);
 
   }
 
@@ -321,8 +338,6 @@ class _Measure extends State<Measure> {
     _lock = true;
 
     //Todo: stop & remove 를 묶는 함수를 만들어서 nextVideo 전에 호출
-
-
     if(currentVideoOrder >= 2) {
       // 첫번째, 두번째 비디오빼고, 뒤에서 세번째 비디오부터 지운다.
       _removeController();
@@ -352,14 +367,25 @@ class _Measure extends State<Measure> {
   Future<void> _playController(int index) async {
     var controller = getCurrentController(index);
 
+
+
     if(index > 0){
       //1번째 이상 비디오에서 이전 비디오를 중지
       _stopController(index - 1);
     }
 
+    if(index == 0) {
+      // 재생 되는 순간, 센서데이터 수집
+      await puck.setSensorOnOff(
+          false, true, puck.puck1.value!);
+      await puck.setSensorOnOff(
+          false, true, puck.puck2.value!);
+      puck.notify('0005', puck.puck1.value!, true);
+      puck.notify('0005', puck.puck2.value!, true);
+    }
+
     await controller.play();
-
-
+    // sensorData = [];
   }
 
   void _toggle(){
@@ -373,272 +399,288 @@ class _Measure extends State<Measure> {
     int position = controller.value.position.inSeconds + 1;
 
     setState((){
-      currentCount = position == 0 ? 1 : position % 2 == 0 ? (position / 2).floor() : (position / 2).floor() + 1;
+
+      if(position == 0) {
+        currentCount = 1;
+      } else {
+        if(position % 2 == 0) {
+          currentCount = (position / 2).floor();
+          print("🐳🐳sensorData ${sensorData}");
+        } else {
+          // 1,3,5
+          currentCount = (position / 2).floor() + 1;
+
+
+          sensorCount["deviceName"] = "J-1";
+          sensorCount["deviceUUid"] = puck.puck1.value!.id;
+          sensorCount["exSN"] = currentVideoOrder + 1;
+          sensorCount["userExCnt"] = currentCount;
+          sensorCount["val"] = sensorDataPuck1;
+
+          sensorCount["deviceName"] = "J-2";
+          sensorCount["deviceUUid"] = puck.puck2.value!.id;
+          sensorCount["exSN"] = currentVideoOrder + 1;
+          sensorCount["userExCnt"] = currentCount;
+          sensorCount["val"] = sensorDataPuck2;
+
+          // count가 증가하는 시점, 여기까지 모은 데이터를 sensorData에 넣어준다.
+          // 넣어주는데 no만 붙여서 넣어준다... (이건 데이터 오면)
+          sensorData.add(sensorCount);
+
+          // 블루투스 센서 배열 넣어주고, 데이터 비우기
+          puck.clearSensorData();
+        }
+      }
     });
 
     return currentCount;
   }
 
-  void showKeepGoingAlert () {
-    List<String> menuList = ["계속", "-", "이번 동작 스킵", "측정 중단 후 다음에 할래요"];
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(
-              Radius.circular(20.0),
-            ),
-          ),
-          contentPadding: const EdgeInsets.all(10.0),
-          title: const Text("진행 의사",
-              style: TextStyle(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center
-          ),
-          content: SizedBox(
-            height: 320,
-            child: Column(
-              children: [
-                const Text("너무 힘들다면 다음 동작으로"),
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 40),
-                  child: Text("넘어갈까요?"),
-                ),
-                const Divider(),
-                SizedBox(
-                  width: 240,
-                  height: 220,
-                  child: ListView.separated(
-                    itemCount: menuList.length,
-                    itemBuilder: (context, index) {
-                      return Column(
-                        // mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            height: 40,
-                            alignment: Alignment.center,
-                            child: ListTile(
-                              onTap: (){
-                                print("${index} 🦧🦧");
-                                if(index == 0) {
-                                  Navigator.pop(context);
-                                }
-                              },
-                              leading: Text(menuList[index], textAlign: TextAlign.center),
-                              selectedColor: Colors.blue,
-                              textColor: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                    separatorBuilder: (BuildContext context, int index) => const Divider(),
-                  )
-                )
-              ]
-            )
-          )
-        );
-      }
-    );
-  }
+  // void showKeepGoingAlert () {
+  //   List<String> menuList = ["계속", "-", "이번 동작 스킵", "측정 중단 후 다음에 할래요"];
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) {
+  //       return AlertDialog(
+  //         backgroundColor: Colors.white,
+  //         shape: const RoundedRectangleBorder(
+  //           borderRadius: BorderRadius.all(
+  //             Radius.circular(20.0),
+  //           ),
+  //         ),
+  //         contentPadding: const EdgeInsets.all(10.0),
+  //         title: const Text("진행 의사",
+  //             style: TextStyle(fontWeight: FontWeight.bold),
+  //             textAlign: TextAlign.center
+  //         ),
+  //         content: SizedBox(
+  //           height: 320,
+  //           child: Column(
+  //             children: [
+  //               const Text("너무 힘들다면 다음 동작으로"),
+  //               const Padding(
+  //                 padding: EdgeInsets.only(bottom: 40),
+  //                 child: Text("넘어갈까요?"),
+  //               ),
+  //               const Divider(),
+  //               SizedBox(
+  //                 width: 240,
+  //                 height: 220,
+  //                 child: ListView.separated(
+  //                   itemCount: menuList.length,
+  //                   itemBuilder: (context, index) {
+  //                     return Column(
+  //                       // mainAxisAlignment: MainAxisAlignment.center,
+  //                       children: [
+  //                         Container(
+  //                           height: 40,
+  //                           alignment: Alignment.center,
+  //                           child: ListTile(
+  //                             onTap: (){
+  //                               print("${index} 🦧🦧");
+  //                               if(index == 0) {
+  //                                 Navigator.pop(context);
+  //                               }
+  //                             },
+  //                             leading: Text(menuList[index], textAlign: TextAlign.center),
+  //                             selectedColor: Colors.blue,
+  //                             textColor: Colors.grey,
+  //                           ),
+  //                         ),
+  //                       ],
+  //                     );
+  //                   },
+  //                   separatorBuilder: (BuildContext context, int index) => const Divider(),
+  //                 )
+  //               )
+  //             ]
+  //           )
+  //         )
+  //       );
+  //     }
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
+    print("sensorDataPuck1 ${sensorDataPuck1}");
+    print("sensorDataPuck2 ${sensorDataPuck2}");
     return Scaffold (
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios),
-        onPressed: () {
-          Navigator.pop(context);
-        }
-        ),
-        title: const Text("측정"),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 70),
-          child: Center(
-            child: Column(
-              children: <Widget>[
-                ExVideo(controller: getCurrentController(currentVideoOrder), currentVideoOrder: currentVideoOrder,
-                    visible: _visible, playHandler: playHandler,
-                    toggle: _toggle,
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.keyboard_arrow_left),
-                      onPressed: (){},
-                    ),
-                    const Text("스쿼트 1/3 SET", style: TextStyle(fontSize: 16)),
-                    IconButton(
-                      icon: const Icon(Icons.keyboard_arrow_right),
-                      onPressed: (){},
-                    )
-                  ]
-                ),
-                const Text("에이미는 월요일이 싫어요!!"),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                      children: [
-                      for(num i=1; i< getCurrentController(currentVideoOrder).value.duration.inSeconds/2.round() + 1; i++)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 20),
-                          child: TextButton(
-                              onPressed: () {
-                                // setState((){
-                                //   currentCount = int.parse("$i");
-                                // });
-                              },
-                              style: TextButton.styleFrom(
-                                  textStyle: const TextStyle(fontSize: 16),
-                                  backgroundColor:  getCount() == int.parse("$i") ? Colors.orangeAccent : Colors.transparent,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(100), // <-- Radius
-                                ),
-                              ),
-                                  child: Text("$i",
-                                      style: TextStyle(
-                                          color:  getCount() == int.parse("$i") ? Colors.black : Colors.grey,
-                                      )),
-                              ),
-                        ),
-
-                      ]
-                    )
-                  ),
-                  GestureDetector(
-                    onTap: (){
-                        getCurrentController(currentVideoOrder).seekTo(Duration.zero);
-                        getCurrentController(currentVideoOrder).play();
-                    },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Image.asset('images/retry.png', width: 16),
-                          const Padding(
-                            padding: EdgeInsets.only(left: 3),
-                            child: Text("동작 다시하기", style: TextStyle(fontSize: 12)),
-                          ),
-                      ]
-                    ),
-                  ),
-                  Obx(() {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 15),
-                      child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  }
+              ),
+              title: const Text("측정"),
+            ),
+            body: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 70),
+                child: Center(
+                  child: Column(
+                    children: <Widget>[
+                      ExVideo(controller: getCurrentController(currentVideoOrder), currentVideoOrder: currentVideoOrder,
+                        visible: _visible, playHandler: playHandler,
+                        toggle: _toggle,
+                      ),
+                      Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            (puck.deviceStatePuck1.value == "connected" && puck.deviceStatePuck2.value == "connected") ? Image.asset('images/blueDot.png', width: 20) : Image.asset('images/redDot.png', width: 20),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 2),
-                              child: Text((puck.deviceStatePuck1.value == "connected" && puck.deviceStatePuck2.value == "connected") ? "퍽 연결" : "연결 해제"),
+                            IconButton(
+                              icon: const Icon(Icons.keyboard_arrow_left),
+                              onPressed: (){},
                             ),
-                            Switch(
-                              value: (puck.deviceStatePuck1.value == "connected" && puck.deviceStatePuck2.value == "connected"),
-                              onChanged: (value) async {
-                                puck.scanConnect();
-                              },
-                              activeTrackColor: Colors.grey,
-                              activeColor: Colors.black,
+                            const Text("스쿼트 1/3 SET", style: TextStyle(fontSize: 16)),
+                            IconButton(
+                              icon: const Icon(Icons.keyboard_arrow_right),
+                              onPressed: (){},
                             )
                           ]
                       ),
-                    );
-                  }),
-                  // const Padding(
-                  //   padding: EdgeInsets.only(top: 25, bottom: 20),
-                  //   child: Text("지금 아픈 곳이 있나요?",
-                  //       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                  //       textAlign: TextAlign.start),
-                  // ),
-                  // SizedBox(
-                  //   height: 50,
-                  //   child: Row(
-                  //     children:<Widget>[
-                  //       Expanded(
-                  //         child: ListView.builder(
-                  //           shrinkWrap: true,
-                  //           // physics: const NeverScrollableScrollPhysics(),
-                  //           scrollDirection: Axis.horizontal,
-                  //           itemCount: painPointList.length,
-                  //           itemBuilder: (context, int index) {
-                  //             return Padding(
-                  //               padding: const EdgeInsets.only(right: 20),
-                  //               child: ElevatedButton(
-                  //                 onPressed: (){
-                  //                   print("🐣🐣 ${painPointList[index]}");
-                  //                   //누르면 어떻게 되는지 기획 모름
-                  //                 },
-                  //                 style: ElevatedButton.styleFrom(
-                  //                   backgroundColor: Colors.white,
-                  //                   foregroundColor: Colors.black,
-                  //                   padding: const EdgeInsets.only(right: 10, left: 10),
-                  //                 ),
-                  //                 child: Text(painPointList[index]),
-                  //               ),
-                  //             );
-                  //           },
-                  //         ),
-                  //       )
-                  //     ]
-                  //   ),
-                  // ),
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 20),
-                      child: SizedBox(
-                        width: 320,
-                        height: 50,
-                        child: OutlinedButton(
-                          onPressed: () {
-                            //측정 완료 팝업 띄우기기
-                            showDialog(
-                                context: context,
-                                builder: (context) {
-                                  return const ShowLastPopup(route: "/");
-                                }
-                            );
-                          },
-                          child: const Text("측정 완료하기!"),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            foregroundColor: Colors.white,
+                      const Text("에이미는 월요일이 싫어요!!"),
+                      SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                              children: [
+                                for(num i=1; i< getCurrentController(currentVideoOrder).value.duration.inSeconds/2.round() + 1; i++)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 20),
+                                    child: TextButton(
+                                      onPressed: () {
+                                        // setState((){
+                                        //   currentCount = int.parse("$i");
+                                        // });
+                                      },
+                                      style: TextButton.styleFrom(
+                                        textStyle: const TextStyle(fontSize: 16),
+                                        backgroundColor:  getCount() == int.parse("$i") ? Colors.orangeAccent : Colors.transparent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(100), // <-- Radius
+                                        ),
+                                      ),
+                                      child: Text("$i",
+                                          style: TextStyle(
+                                            color:  getCount() == int.parse("$i") ? Colors.black : Colors.grey,
+                                          )),
+                                    ),
+                                  ),
+
+                              ]
+                          )
+                      ),
+                      GestureDetector(
+                        onTap: (){
+                          getCurrentController(currentVideoOrder).seekTo(Duration.zero);
+                          getCurrentController(currentVideoOrder).play();
+                        },
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Image.asset('images/retry.png', width: 16),
+                              const Padding(
+                                padding: EdgeInsets.only(left: 3),
+                                child: Text("동작 다시하기", style: TextStyle(fontSize: 12)),
+                              ),
+                            ]
+                        ),
+                      ),
+                      Obx(() =>
+                        Padding(
+                          padding: const EdgeInsets.only(right: 15),
+                          child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                (puck.deviceStatePuck1.value ==
+                                    BluetoothDeviceState.connected &&
+                                    puck.deviceStatePuck2.value ==
+                                        BluetoothDeviceState.connected) ? Image.asset(
+                                    'images/blueDot.png', width: 20) : Image.asset(
+                                    'images/redDot.png', width: 20),
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 2),
+                                  child: Text((puck.deviceStatePuck1.value ==
+                                      BluetoothDeviceState.connected &&
+                                      puck.deviceStatePuck2.value ==
+                                          BluetoothDeviceState.connected)
+                                      ? "퍽 연결"
+                                      : "연결 해제"),
+                                ),
+                                Switch(
+                                  value: (puck.deviceStatePuck1.value ==
+                                      BluetoothDeviceState.connected &&
+                                      puck.deviceStatePuck2.value ==
+                                          BluetoothDeviceState.connected) ? true : false,
+                                  onChanged: (value) async {
+                                    puck.scanConnect();
+                                  },
+                                  activeTrackColor: Colors.grey,
+                                  activeColor: Colors.black,
+                                ),
+                                ElevatedButton(
+                                    onPressed: () async {
+                                      await puck.setSensorOnOff(
+                                          false, true, puck.puck1.value!);
+
+                                      await puck.setSensorOnOff(
+                                          false, true, puck.puck2.value!);
+                                    },
+                                    child: Text('센서 on')),
+                              ]
+                          ),
+                        )
+                      ),
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: SizedBox(
+                            width: 320,
+                            height: 50,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                //측정 완료 팝업 띄우기기
+                                showDialog(
+                                    context: context,
+                                    builder: (context) {
+                                      return const ShowLastPopup(route: "/");
+                                    }
+                                );
+                              },
+                              child: const Text("측정 완료하기!"),
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showModalBottomSheet<void>(
-              context: context,
-              builder: (BuildContext context) {
-                return Container(
-                  height: 400,
-                  color: Colors.white,
-                  child: FindPuck(),
-                );
-              }
-          );
-        },
-        child: const Icon(Icons.link),
-        backgroundColor: Colors.grey
-
-      )
+            floatingActionButton: FloatingActionButton(
+                onPressed: () {
+                  showModalBottomSheet<void>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return Container(
+                          height: 400,
+                          color: Colors.white,
+                          child: FindPuck(),
+                        );
+                      }
+                  );
+                },
+                child: const Icon(Icons.link),
+                backgroundColor: Colors.grey
+            )
     );
   }
 }

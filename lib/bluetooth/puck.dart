@@ -105,6 +105,7 @@ class Puck extends GetxController {
   }
 
   void connectDevice(BluetoothDevice device) async {
+    print("device ${device}");
     await device.connect();
 
     //Puck1
@@ -179,6 +180,8 @@ class Puck extends GetxController {
   //Todo: 측정에서 센서 데이터를 받아오기 위해 임시로 만든 함수, 지울 예정입니다.
   void scanConnect () async {
     var scanList = await scan();
+    print("🐣🐣🐣 ${scanList} scanList!!!!");
+
     var puck1 = scanList[0];
     var puck2 = scanList[1];
 
@@ -225,7 +228,7 @@ class Puck extends GetxController {
   setSensorOnOff(bool frequency, bool sensor, BluetoothDevice device) async {
     BluetoothCharacteristic? _char = _deviceToCharList(device)['0004'];
 
-    print(_char);
+    print("🐣🐣🐣🐣🐣🐣🐣🐣🐣device ${device}");
 
     if (_char == null || _char.properties.write == false) return;
 
@@ -236,6 +239,7 @@ class Puck extends GetxController {
     } else if (frequency == true && sensor == false) {
       await _char.write([16]);
     } else if (frequency == false && sensor == true) {
+      print("here!!!");
       await _char.write([1]);
     } else if (frequency == false && sensor == false) {
       await _char.write([0]);
@@ -270,11 +274,16 @@ class Puck extends GetxController {
   }
 
   notify(String charKey, BluetoothDevice device, bool toogle) async {
+    print("notify click!");
     BluetoothCharacteristic? _char = _deviceToCharList(device)[charKey];
+
+    print("_char!!! ${_char}");
+
 
     if (_char == null || _char.properties.notify == false) return;
 
     await _char.setNotifyValue(toogle);
+
 
     if (toogle == true) {
       _char.value.listen((event) {
@@ -289,11 +298,17 @@ class Puck extends GetxController {
     }
   }
 
+  void clearSensorData () {
+    sensorModePuck1.clear();
+    sensorModePuck2.clear();
+  }
+
   Map<String, BluetoothCharacteristic?> _deviceToCharList(
       BluetoothDevice device) {
-    if (device.name == PUCK1)
+    if (device.name == PUCK1) {
       return charPuck1;
-    else
+    } else {
       return charPuck2;
+    }
   }
 }
