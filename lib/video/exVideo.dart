@@ -7,26 +7,21 @@ class ExVideo extends StatefulWidget {
 
   const ExVideo({super.key,
     required this.controller,
-    required this.changeVideo,
-    required this.isHumanCountMode,
     required this.visible,
     required this.playHandler,
     required this.toggle,
+    required this.currentVideoOrder,
   });
 
   final VideoPlayerController controller;
-  final VoidCallback changeVideo;
-  final bool isHumanCountMode;
   final bool visible;
   final VoidCallback playHandler;
   final VoidCallback toggle;
-
+  final int currentVideoOrder;
 
   @override
   _ExVideo createState() => _ExVideo();
-
 }
-
 
 class _ExVideo extends State<ExVideo> {
 
@@ -42,8 +37,6 @@ class _ExVideo extends State<ExVideo> {
   void dispose() {
     super.dispose();
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +84,16 @@ class _ExVideo extends State<ExVideo> {
                     valueListenable: widget.controller,
                     builder: (context, VideoPlayerValue value, child) {
                       //Do Something with the value.
-                      return Text(value.position.toString().split('.')[0]);
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 5.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(value.position.toString().split('.')[0]),
+                            Text(" / ${value.duration.toString().split('.')[0]}")
+                          ],
+                        ),
+                      );
                     },
                   ),
                 ]
@@ -127,28 +129,6 @@ class _ExVideo extends State<ExVideo> {
                   setState((){
                     isFullScreen = !isFullScreen;
                   });
-                },
-              ),
-            ),
-            Positioned(
-              top: 70,
-              right: 0,
-              child: Switch(
-                activeColor: Colors.red,
-                value: widget.isHumanCountMode,
-                onChanged: (bool value) {
-                  widget.changeVideo();
-                },
-              ),
-            ),
-            Positioned(
-              top: 100,
-              right: 0,
-              child: Switch(
-                activeColor: Colors.red,
-                value: false,
-                onChanged: (bool value) {
-                  print("대체 영상 준비");
                 },
               ),
             ),

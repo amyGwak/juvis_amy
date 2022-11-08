@@ -7,10 +7,34 @@ import '../bluetooth/puck1.dart';
 import '../bluetooth/puck2.dart';
 import '../popup.dart';
 import 'exVideo.dart';
+import 'package:http/http.dart';
+import 'dart:convert' as convert;
 
 
 Puck1 puck1 = Puck1();
 Puck2 puck2 = Puck2();
+
+class VideoObject {
+  final int uedSeq;
+  final int order;
+  final String uedExDate;
+  final String exCd;
+  final int uepdShowTime;
+  final int uepdExCnt;
+  final int uepdResultKcal;
+  final int uepdQaSeq;
+  final int uepdUserExCnt;
+  final int exSeq;
+  final String exName;
+  final int exKcal;
+  final String exUrl;
+  final String exDesc;
+  final String completeyn;
+
+  VideoObject(this.uedSeq, this.order, this.uedExDate, this.exCd, this.uepdShowTime, this.uepdExCnt, this.uepdResultKcal, this.uepdQaSeq,
+      this.uepdUserExCnt, this.exSeq, this.exName, this.exKcal, this.exUrl, this.exDesc, this.completeyn);
+}
+
 
 class Measure extends StatefulWidget {
   const Measure({Key? key}) : super(key:key);
@@ -21,313 +45,380 @@ class Measure extends StatefulWidget {
 
 class _Measure extends State<Measure> {
 
-  late Duration currentPosition;
   int currentVideoOrder = 0;
-  int currentCount = 0;
+  int currentCount = 1;
   bool _visible = true;
-  List<String> painPointList = ["어깨 통증", "팔이 두둑거림", "날개뼈 통증", "어지러움", "허리 통증"];
-
-
-  bool isHumanCountMode = false;
 
   //영상 관련
-  final Map<String, VideoPlayerController> _controllers = {};
+  final Map<int, VideoPlayerController> _controllers = {};
   final Map<int, VoidCallback> _listeners = {};
 
-  final Map<String, VideoPlayerController> _humanControllers = {};
-  final Map<int, VoidCallback> _humanListeners = {};
-
-
-
-
   bool _lock = true;
-  late Timer _timer;
+  // late Timer _timer;
 
   // 운동 영상
   Set<String> streamUrl = {
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
     "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/5%E1%84%8E%E1%85%A9.mp4",
+    "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+        "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
   };
 
-  // 본운동(human count 영상)
-  Set<String> humanCountUrl = {
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/KakaoTalk_Video_2022-10-26-19-00-51.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/5%E1%84%8E%E1%85%A9.mp4",
-  };
-
-  // 대체 영상 1개
-  // 본 운동이 싫으면 언제든지 대체 가능해야 한다. 이거는 지금 changeVideo 처럼 하면 된다.
-
-  String alterUrl = "https://amytest2.s3.ap-northeast-2.amazonaws.com/alter.mp4";
-  late VideoPlayerController alterController;
-  late VoidCallback _alterListeners;
-  // 대체 영상이 종료 되면 currentVideoOrder++, break 영상으로 넘어간다. 그리고 본 운동의 human / default mode에 따라 controller(currentVideoOrder)로 바꿔준다.
-
-  // break 영상 1개
-  // break 영상은 무조건 본 운동 사이에 나와야 함!
-  // 영상1 - break - 영상2 - break - 영상3 - break - 영상4 - break - 영상5 - break - 영상6 - break - 영상7 - break - 영상8 - break - 영상9
-  String breakUrl = "https://amytest2.s3.ap-northeast-2.amazonaws.com/break.mp4";
-  late VideoPlayerController breakController;
-  late VoidCallback _breakListeners;
-  // 본운동이 종료되면, break 영상이 들어온다. 그리고 본 운동의 mode에 따라 다음 영상을 틀어준다.
 
 
-  List<int> videoOrder = [];
+
+
+  // 영상 재생 순서
+
+  // initController (20개 컨트롤러 준비) - 모든 controller 전부
+  // listenController (준비된 컨트롤러에 listener 구독) - controller 별로 다르다. 다음 영상 준비 함수 필
+  // playController (재생시킨다) - play()만
+  // stopController (중지됬을 때) - pause(), 리스너 구독을 여기서 해제할 필요 있나? 삭제하면..?
+  // removeController (재생이 끝난 -2번째 비디오를 삭제한다) - 두번째 영상전꺼를 아예 controllers에서 삭제, dispose
+  // reset 하는 함수 ( 모든 controller dispose, 최상위 dispose에서 )
+
+
+
+  // api가 아래처럼 내려온다.
+  List<Map<String, dynamic>> apiVideoList = <Map<String, dynamic>>[
+        {
+          "uedSeq": 1,
+          "order": 0,
+          "uedExDate": "2022-10-25",
+          "exCd": "ready",
+          "uepdShowTime": 0,
+          "uepdExCnt": 5,
+          "uepdResultKcal": 100,
+          "uepdQaSeq": 10,
+          "uepdUserExCnt": 3,
+          "exSeq": 1,
+          "exName": "스쿼트",
+          "exKcal": 20,
+          "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
+          "exDesc": "설명",
+          "completeyn": "Y"
+        },
+        {
+          "uedSeq": 2,
+          "order": 1,
+          "uedExDate": "2022-10-25",
+          "exCd": "break",
+          "uepdShowTime": 0,
+          "uepdExCnt": 5,
+          "uepdResultKcal": 100,
+          "uepdQaSeq": 10,
+          "uepdUserExCnt": 3,
+          "exSeq": 1,
+          "exName": "스쿼트",
+          "exKcal": 20,
+          "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+          "exDesc": "설명",
+          "completeyn": "Y"
+        },
+        {
+        "uedSeq": 1,
+        "order": 2,
+        "uedExDate": "2022-10-25",
+        "exCd": "main",
+        "uepdShowTime": 0,
+        "uepdExCnt": 5,
+        "uepdResultKcal": 100,
+        "uepdQaSeq": 10,
+        "uepdUserExCnt": 3,
+        "exSeq": 1,
+        "exName": "스쿼트",
+        "exKcal": 20,
+        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
+        "exDesc": "설명",
+        "completeyn": "Y"
+      },
+      {
+        "uedSeq": 2,
+        "order": 3,
+        "uedExDate": "2022-10-25",
+        "exCd": "break",
+        "uepdShowTime": 0,
+        "uepdExCnt": 5,
+        "uepdResultKcal": 100,
+        "uepdQaSeq": 10,
+        "uepdUserExCnt": 3,
+        "exSeq": 1,
+        "exName": "스쿼트",
+        "exKcal": 20,
+        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+        "exDesc": "설명",
+        "completeyn": "Y"
+      },
+      {
+        "uedSeq": 1,
+        "order": 4,
+        "uedExDate": "2022-10-25",
+        "exCd": "main",
+        "uepdShowTime": 0,
+        "uepdExCnt": 5,
+        "uepdResultKcal": 100,
+        "uepdQaSeq": 10,
+        "uepdUserExCnt": 3,
+        "exSeq": 1,
+        "exName": "스쿼트",
+        "exKcal": 20,
+        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
+        "exDesc": "설명",
+        "completeyn": "Y"
+      },
+      {
+        "uedSeq": 2,
+        "order": 5,
+        "uedExDate": "2022-10-25",
+        "exCd": "break",
+        "uepdShowTime": 0,
+        "uepdExCnt": 5,
+        "uepdResultKcal": 100,
+        "uepdQaSeq": 10,
+        "uepdUserExCnt": 3,
+        "exSeq": 1,
+        "exName": "스쿼트",
+        "exKcal": 20,
+        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+        "exDesc": "설명",
+        "completeyn": "Y"
+      },
+      {
+        "uedSeq": 1,
+        "order": 6,
+        "uedExDate": "2022-10-25",
+        "exCd": "finish",
+        "uepdShowTime": 0,
+        "uepdExCnt": 5,
+        "uepdResultKcal": 100,
+        "uepdQaSeq": 10,
+        "uepdUserExCnt": 3,
+        "exSeq": 1,
+        "exName": "스쿼트",
+        "exKcal": 20,
+        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4",
+        "exDesc": "설명",
+        "completeyn": "Y"
+      }
+  ];
+
 
 
   @override
   void initState() {
-    super.initState();
+  super.initState();
 
-    // Future.delayed(const Duration(milliseconds: 100));
 
-    if(mounted && streamUrl.isNotEmpty) {
-      _initController(0).then((_) {
-        _playController(0);
-        setTimer();
-      });
-    }
-
-    if(mounted && streamUrl.length > 1) {
-      _initController(1).whenComplete(() => _lock = false);
-    }
-
-    videoOrder = List<int>.generate(streamUrl.length + 1, (i) => i + 1);
+  login();
+  if (mounted && apiVideoList.isNotEmpty) {
+    _initFirstController().then((_) {
+    // startTimer();
+      _listenController(0);
+      _playController(0);
+      _lock = false;
+    });
+  }
 
   }
 
   @override
   void deactivate() {
-    super.deactivate();
+  super.deactivate();
   }
 
   @override
   void dispose() {
-    // 마지막 controller와 그 이전 controller 지워주기
-    _humanController(currentVideoOrder).dispose();
-    _controller(currentVideoOrder).dispose();
-    _timer.cancel();
-    super.dispose();
+  // 마지막 controller와 그 이전 controller 지워주기
+  _controllers[currentVideoOrder]?.dispose();
+  _controllers[currentVideoOrder - 1]?.dispose();
+  // _timer.cancel();
+
+  super.dispose();
   }
 
+
+  void login () async {
+
+  }
+
+
+
+  VideoPlayerController getCurrentController (index) {
+    return _controllers[index]!;
+  }
+
+
   void playHandler () {
-    var controller = isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder);
+    var controller = getCurrentController(currentVideoOrder);
+
     if(controller.value.isPlaying) {
       controller.pause();
-      _timer.cancel();
       _visible = true;
     } else {
       controller.play();
       setState((){
         _visible = false;
-        if(!_timer.isActive){
-          setTimer();
-        }
       });
     }
-
   }
 
-  void setTimer () {
-    _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      var controller = isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder);
-      setState((){
-        if(controller.value.isPlaying) {
-          currentCount++;
-        }
-      });
-    });
-  }
+  // Future<void> startTimer () async {
+  //   _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
+  //     var controller =  getCurrentController(currentVideoOrder);
+  //     setState((){
+  //       if(controller.value.isPlaying) {
+  //         currentCount++;
+  //       }
+  //     });
+  //   });
+  // }
 
-  VideoPlayerController _controller(int index) {
-    return _controllers[streamUrl.elementAt(index)]!;
-  }
 
-  VideoPlayerController _humanController(int index) {
-    return _humanControllers[humanCountUrl.elementAt(index)]!;
-  }
 
   VoidCallback _listenerSpawner(index) {
+
+    var controller = getCurrentController(index);
+
     return () {
+
       int? duration;
       int? position;
 
-      if(isHumanCountMode) {
-        duration = _humanController(index).value.duration.inSeconds;
-        position = _humanController(index).value.position.inSeconds;
-      } else {
-        duration = _controller(index).value.duration.inSeconds;
-        position = _controller(index).value.position.inSeconds;
-      }
-
+      duration = controller.value.duration.inSeconds;
+      position = controller.value.position.inSeconds;
 
       setState((){
-        if(duration! <= position!) {
-          // 운동 영상이 종료되면,
-          return;
+        if(duration! - position! < 1) {
+          // 0 이거나 음수일 때 = 영상 재생 중일 때
+          if(index < apiVideoList.length - 1) {
+            // 영상이 마지막 영상이 아닐때, 다음 비디오로 넘어간다.
+            _nextVideo();
+          } else {
+            // 마지막 영상이면 운동 완료 페이지로 이동시켜줘야 함
+            // 기획에 따라 재정비
+          }
         }
       });
-
-      if(duration - position < 1) {
-        // 0 이거나 음수일 때 = 아직 영상이 종료되지 않음
-        if(index < streamUrl.length - 1) {
-          // 영상이 마지막 영상이 아닐때, 다음 비디오로 넘어간다.
-          _nextVideo();
-        } else {
-          // 마지막 영상이면 운동 완료 페이지로 이동시켜줘야 함
-        }
-      }
     };
   }
 
 
-  Future<void> _initController(int index) async {
-    var controller = VideoPlayerController.network(streamUrl.elementAt(index));
-    var humanController = VideoPlayerController.network(humanCountUrl.elementAt(index));
-    var alterController = VideoPlayerController.network(alterUrl);
-    var breakController = VideoPlayerController.network(breakUrl);
+  // 처음에 딱 한번만 초기화(1개 컨트롤러)
+  Future<void> _initFirstController () async {
+    _controllers[currentVideoOrder] = VideoPlayerController.network(apiVideoList[0]["exUrl"]);
+    await _controllers[currentVideoOrder]?.initialize();
 
-    _controllers[streamUrl.elementAt(index)] = controller;
-    _humanControllers[humanCountUrl.elementAt(index)] = humanController;
-
-    await controller.initialize();
-    await humanController.initialize();
-
-    // 대체영상과 break 영상도 초기화
-    await alterController.initialize();
-    await breakController.initialize();
   }
 
+  Future<void> _initNextController(int index) async {
+    // index 로 넘어온 것들만 초기화
+    print("${index} index!!");
+    var controller = VideoPlayerController.network(apiVideoList[index]["exUrl"]);
+    _controllers[index] = controller;
+    print("_controllers[index] ${_controllers[index]}");
+    await controller.initialize();
+  }
+
+
+
   // controller 아예 삭제
-  void _removeController(int index) {
-    if(isHumanCountMode) {
-      _humanController(index).dispose();
-      _humanControllers.remove(humanCountUrl.elementAt(index));
-      _humanListeners.remove(index);
-    } else {
-      _controller(index).dispose();
-      _controllers.remove(streamUrl.elementAt(index));
+  void _removeController() {
+    var index = currentVideoOrder - 2;
+    var controller = getCurrentController(index);
+
+      controller.dispose();
+      _controllers.remove(index);
       _listeners.remove(index);
     }
 
-  }
 
   void _stopController(int index) {
-    if(isHumanCountMode) {
-      _humanController(index).removeListener(_humanListeners[index]!);
-      _humanController(index).pause();
-      _humanController(index).seekTo(Duration.zero);
-    } else {
-      _controller(index).removeListener(_listeners[index]!);
-      _controller(index).pause();
-      _controller(index).seekTo(Duration.zero);
+    var controller = getCurrentController(index);
+
+    controller.removeListener(_listeners[index]!);
+    controller.pause();
+    // controller.seekTo(Duration.zero);
+
+  }
+
+
+  Future<void> _listenController(int index) async {
+
+    var controller = getCurrentController(index);
+
+    if(!_listeners.keys.contains(index)) {
+      _listeners[index] = _listenerSpawner(index);
     }
-  }
+    controller.addListener(_listeners[index]!);
+}
 
 
-  void _playController(int index) async {
-
-
-      if(!_humanListeners.keys.contains(index)) {
-        _humanListeners[index] = _listenerSpawner(index);
-      }
-      _humanController(index).addListener(_humanListeners[index]!);
-
-      if(index != 0 && isHumanCountMode) {
-        await _humanController(index).play();
-        currentCount = 0;
-      }
-
-
-
-      if(!_listeners.keys.contains(index)) {
-        _listeners[index] = _listenerSpawner(index);
-      }
-      _controller(index).addListener(_listeners[index]!);
-
-      if(index != 0 && !isHumanCountMode) {
-        await _controller(index).play();
-        currentCount = 0;
-      }
-
-
-    setState((){});
-
-  }
-
-
-
+  //Todo: 해당 함수는 다음 영상을 준비 해주는 것만 하기
   void _nextVideo () async {
-    if(_lock || currentVideoOrder == streamUrl.length - 1) {
+    if(_lock || currentVideoOrder == apiVideoList.length - 1) {
       //마지막 비디오라면
       return;
     }
 
     _lock = true;
-    _stopController(currentVideoOrder);
+
+    //Todo: stop & remove 를 묶는 함수를 만들어서 nextVideo 전에 호출
+
 
     if(currentVideoOrder >= 2) {
-      //첫번째, 두번째 비디오빼고, 뒤에서 세번째 비디오부터 지운다.
-      _removeController(currentVideoOrder - 2);
+      // 첫번째, 두번째 비디오빼고, 뒤에서 세번째 비디오부터 지운다.
+      _removeController();
     }
 
-    _playController(++currentVideoOrder);
 
-    if(currentVideoOrder == streamUrl.length - 1){
+    if(currentVideoOrder == apiVideoList.length - 1){
       //마지막 비디오면..
       _lock = false;
     } else {
       //마지막 비디오 아니면, 다음 비디오 controller 준비한다.
-      _initController(currentVideoOrder + 1).whenComplete(() => _lock = false);
-    }
-  }
+      await _initNextController(currentVideoOrder + 1);
+      await _listenController(currentVideoOrder + 1);
+      await _playController(currentVideoOrder + 1);
 
-  void changeVideo() {
-
-    if(isHumanCountMode) {
-      _humanController(currentVideoOrder).pause();
-      currentPosition = _humanController(currentVideoOrder).value.position;
-
-      _controller(currentVideoOrder).seekTo(currentPosition);
-      setState((){});
-      _controller(currentVideoOrder).play();
-
-    } else {
-
-      _controller(currentVideoOrder).pause();
-      currentPosition = _controller(currentVideoOrder).value.position;
-
-      _humanController(currentVideoOrder).seekTo(currentPosition);
-      setState((){});
-      _humanController(currentVideoOrder).play();
+      _lock = false;
 
     }
 
-    setState(() {
-      isHumanCountMode = !isHumanCountMode;
-    });
-
-  }
-
-
-  VideoPlayerController getController () {
-    if(isHumanCountMode) {
-      return _humanController(currentVideoOrder);
-    } else {
-      return _controller(currentVideoOrder);
-    }
-  }
-
-void _toggle(){
     setState((){
-      _visible = !_visible;
+      currentVideoOrder += 1;
     });
+
+  }
+
+
+  Future<void> _playController(int index) async {
+    var controller = getCurrentController(index);
+
+    if(index > 0){
+      //1번째 이상 비디오에서 이전 비디오를 중지
+      _stopController(index - 1);
+    }
+
+    await controller.play();
+
+
+  }
+
+  void _toggle(){
+      setState((){
+        _visible = !_visible;
+      });
+  }
+
+  int getCount () {
+    var controller = getCurrentController(currentVideoOrder);
+    int position = controller.value.position.inSeconds + 1;
+
+    setState((){
+      currentCount = position == 0 ? 1 : position % 2 == 0 ? (position / 2).floor() : (position / 2).floor() + 1;
+    });
+
+    return currentCount;
   }
 
   void showKeepGoingAlert () {
@@ -407,7 +498,7 @@ void _toggle(){
           Navigator.pop(context);
         }
         ),
-        title: Text("측정"),
+        title: const Text("측정"),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -415,130 +506,10 @@ void _toggle(){
           child: Center(
             child: Column(
               children: <Widget>[
-                ExVideo(controller: getController(), changeVideo: changeVideo,
-                    isHumanCountMode: isHumanCountMode, visible: _visible, playHandler: playHandler,
+                ExVideo(controller: getCurrentController(currentVideoOrder), currentVideoOrder: currentVideoOrder,
+                    visible: _visible, playHandler: playHandler,
                     toggle: _toggle,
                 ),
-                // Stack(
-                //   alignment: Alignment.center,
-                //   children: [
-                //     Column(
-                //       children: [
-                //         GestureDetector(
-                //           onTap: (){
-                //             _toggle();
-                //           },
-                //           child: Stack(
-                //             children: [
-                //               isFullScreen ?
-                //               RotatedBox(
-                //                 quarterTurns: 1,
-                //                 child: AspectRatio(
-                //                   aspectRatio: isHumanCountMode ? _humanController(currentVideoOrder).value.aspectRatio : _controller(currentVideoOrder).value.aspectRatio,
-                //                   child: Container(
-                //                     height: 100,
-                //                       color: Colors.black,
-                //                       child: isHumanCountMode ? VideoPlayer(_humanController(currentVideoOrder)) : VideoPlayer(_controller(currentVideoOrder))),
-                //                 ),
-                //               ) :
-                //               AspectRatio(
-                //                 aspectRatio: isHumanCountMode ? _humanController(currentVideoOrder).value.aspectRatio : _controller(currentVideoOrder).value.aspectRatio,
-                //                 child: Container(
-                //                     height: 100,
-                //                     color: Colors.black,
-                //                     child: isHumanCountMode ? VideoPlayer(_humanController(currentVideoOrder)) : VideoPlayer(_controller(currentVideoOrder))),
-                //               ),
-                //             ]
-                //           ),
-                //         ),
-                //           VideoProgressIndicator(
-                //               isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder),
-                //               allowScrubbing: false,
-                //           ),
-                //         // Text("$position", textAlign: TextAlign.start),
-                //           ValueListenableBuilder(
-                //             valueListenable:isHumanCountMode ? _humanController(currentVideoOrder) : _controller(currentVideoOrder),
-                //             builder: (context, VideoPlayerValue value, child) {
-                //               //Do Something with the value.
-                //               return Text(value.position.toString().split('.')[0]);
-                //             },
-                //           ),
-                //       ]
-                //     ),
-                //
-                //     Center(
-                //       child: Visibility(
-                //         visible: _visible,
-                //         child: CircleAvatar(
-                //           radius: 20,
-                //           backgroundColor: Colors.white60,
-                //           child: IconButton(
-                //             onPressed: (){
-                //               if(_controller(currentVideoOrder).value.isPlaying || _humanController(currentVideoOrder).value.isPlaying) {
-                //
-                //                 if(isHumanCountMode) {
-                //                   _humanController(currentVideoOrder).pause();
-                //                 } else {
-                //                   _controller(currentVideoOrder).pause();
-                //                 }
-                //                 _timer.cancel();
-                //                 _visible = true;
-                //               } else {
-                //                 if(isHumanCountMode) {
-                //                   _humanController(currentVideoOrder).play();
-                //                 } else {
-                //                   _controller(currentVideoOrder).play();
-                //                 }
-                //
-                //                 setState((){
-                //                   _visible = false;
-                //                   if(!_timer.isActive){
-                //                     _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-                //                       setState((){
-                //                         currentCount++;
-                //                       });
-                //                     });
-                //                   }
-                //                 });
-                //               }
-                //             },
-                //             icon: Icon(
-                //                 _controller(currentVideoOrder).value.isPlaying == true ? Icons.pause : Icons.play_arrow,
-                //                 size: 20,
-                //                 color: Colors.blue),
-                //           )
-                //
-                //         ),
-                //       ),
-                //     ),
-                //   Positioned(
-                //     top: 30,
-                //     right: 0,
-                //     child: IconButton(
-                //       icon: const Icon(Icons.fullscreen),
-                //       color: Colors.white,
-                //       iconSize: 25,
-                //       onPressed: (){
-                //         //full screen horizontal
-                //         setState((){
-                //           isFullScreen = !isFullScreen;
-                //         });
-                //       },
-                //     ),
-                //   ),
-                //   Positioned(
-                //     top: 70,
-                //     right: 0,
-                //     child: Switch(
-                //       activeColor: Colors.red,
-                //       value: isHumanCountMode,
-                //       onChanged: (bool value) {
-                //         changeVideo();
-                //       },
-                //     ),
-                //   ),
-                // ]
-                // ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -553,31 +524,30 @@ void _toggle(){
                     )
                   ]
                 ),
-                const Text("에이미는 스쿼트가 싫어요!!"),
+                const Text("에이미는 월요일이 싫어요!!"),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                       children: [
-                      for(num i=1; i<_controller(currentVideoOrder).value.duration.inSeconds/2.round() + 1; i++)
+                      for(num i=1; i< getCurrentController(currentVideoOrder).value.duration.inSeconds/2.round() + 1; i++)
                         Padding(
                           padding: const EdgeInsets.only(top: 20),
                           child: TextButton(
                               onPressed: () {
-                                  print("🌼🌼$i is clicked");
-                                  setState((){
-                                    currentCount = int.parse("$i");
-                                  });
+                                // setState((){
+                                //   currentCount = int.parse("$i");
+                                // });
                               },
                               style: TextButton.styleFrom(
                                   textStyle: const TextStyle(fontSize: 16),
-                                  backgroundColor: currentCount == int.parse("$i") ? Colors.orangeAccent : Colors.transparent,
+                                  backgroundColor:  getCount() == int.parse("$i") ? Colors.orangeAccent : Colors.transparent,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(100), // <-- Radius
                                 ),
                               ),
                                   child: Text("$i",
                                       style: TextStyle(
-                                          color: currentCount == int.parse("$i") ? Colors.black : Colors.grey,
+                                          color:  getCount() == int.parse("$i") ? Colors.black : Colors.grey,
                                       )),
                               ),
                         ),
@@ -587,16 +557,10 @@ void _toggle(){
                   ),
                   GestureDetector(
                     onTap: (){
-                      if(isHumanCountMode) {
-                        _humanController(currentVideoOrder).seekTo(Duration.zero);
-                        _humanController(currentVideoOrder).play();
-                      } else {
-                        _controller(currentVideoOrder).seekTo(Duration.zero);
-                        _controller(currentVideoOrder).play();
-                      }
-
+                        getCurrentController(currentVideoOrder).seekTo(Duration.zero);
+                        getCurrentController(currentVideoOrder).play();
                       // 타이머 다시 리셋
-                      currentCount = 0;
+                      // currentCount = 0;
 
                     },
                     child: Row(
@@ -634,63 +598,44 @@ void _toggle(){
                       ]
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 20),
-                    child: Text("진행이 어렵다면?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10.0),
-                    child: ElevatedButton(
-                        onPressed: (){
-                          //modal open
-                          showKeepGoingAlert();
-                        },
-                        child: const Text("진행이 어렵다면 눌러주세요"),
-                        style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.only(right: 10, left: 10),
-                      ),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 25, bottom: 20),
-                    child: Text("지금 아픈 곳이 있나요?",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                        textAlign: TextAlign.start),
-                  ),
-                  SizedBox(
-                    height: 50,
-                    child: Row(
-                      children:<Widget>[
-                        Expanded(
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            // physics: const NeverScrollableScrollPhysics(),
-                            scrollDirection: Axis.horizontal,
-                            itemCount: painPointList.length,
-                            itemBuilder: (context, int index) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 20),
-                                child: ElevatedButton(
-                                  onPressed: (){
-                                    print("🐣🐣 ${painPointList[index]}");
-                                    //누르면 어떻게 되는지 기획 모름
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: Colors.black,
-                                    padding: const EdgeInsets.only(right: 10, left: 10),
-                                  ),
-                                  child: Text(painPointList[index]),
-                                ),
-                              );
-                            },
-                          ),
-                        )
-                      ]
-                    ),
-                  ),
+                  // const Padding(
+                  //   padding: EdgeInsets.only(top: 25, bottom: 20),
+                  //   child: Text("지금 아픈 곳이 있나요?",
+                  //       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                  //       textAlign: TextAlign.start),
+                  // ),
+                  // SizedBox(
+                  //   height: 50,
+                  //   child: Row(
+                  //     children:<Widget>[
+                  //       Expanded(
+                  //         child: ListView.builder(
+                  //           shrinkWrap: true,
+                  //           // physics: const NeverScrollableScrollPhysics(),
+                  //           scrollDirection: Axis.horizontal,
+                  //           itemCount: painPointList.length,
+                  //           itemBuilder: (context, int index) {
+                  //             return Padding(
+                  //               padding: const EdgeInsets.only(right: 20),
+                  //               child: ElevatedButton(
+                  //                 onPressed: (){
+                  //                   print("🐣🐣 ${painPointList[index]}");
+                  //                   //누르면 어떻게 되는지 기획 모름
+                  //                 },
+                  //                 style: ElevatedButton.styleFrom(
+                  //                   backgroundColor: Colors.white,
+                  //                   foregroundColor: Colors.black,
+                  //                   padding: const EdgeInsets.only(right: 10, left: 10),
+                  //                 ),
+                  //                 child: Text(painPointList[index]),
+                  //               ),
+                  //             );
+                  //           },
+                  //         ),
+                  //       )
+                  //     ]
+                  //   ),
+                  // ),
                   Align(
                     alignment: Alignment.bottomCenter,
                     child: Padding(
