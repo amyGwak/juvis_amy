@@ -270,6 +270,8 @@ class Puck extends GetxController {
             sensorModePuck1.value.add(event);
             print(
                 '${sensorModePuck1.value.length - 1} : ${sensorModePuck1.value[sensorModePuck1.length - 1]} : ${event}');
+
+            print("sensorModePuck2, ${sensorModePuck2}");
           } else if (device.name == PUCK2) {
             sensorModePuck2.value.add(event);
           }

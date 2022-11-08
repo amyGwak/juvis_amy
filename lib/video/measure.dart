@@ -1,40 +1,16 @@
 import 'dart:ffi';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:async';
 import '../bluetooth/puck1.dart';
 import '../bluetooth/puck2.dart';
 import '../popup.dart';
 import 'exVideo.dart';
-import 'package:http/http.dart';
-import 'dart:convert' as convert;
-
-
-Puck1 puck1 = Puck1();
-Puck2 puck2 = Puck2();
-
-class VideoObject {
-  final int uedSeq;
-  final int order;
-  final String uedExDate;
-  final String exCd;
-  final int uepdShowTime;
-  final int uepdExCnt;
-  final int uepdResultKcal;
-  final int uepdQaSeq;
-  final int uepdUserExCnt;
-  final int exSeq;
-  final String exName;
-  final int exKcal;
-  final String exUrl;
-  final String exDesc;
-  final String completeyn;
-
-  VideoObject(this.uedSeq, this.order, this.uedExDate, this.exCd, this.uepdShowTime, this.uepdExCnt, this.uepdResultKcal, this.uepdQaSeq,
-      this.uepdUserExCnt, this.exSeq, this.exName, this.exKcal, this.exUrl, this.exDesc, this.completeyn);
-}
-
+import '/bluetooth/puck.dart';
+import 'package:get/get_state_manager/get_state_manager.dart';
+import 'package:get/state_manager.dart';
 
 class Measure extends StatefulWidget {
   const Measure({Key? key}) : super(key:key);
@@ -48,24 +24,13 @@ class _Measure extends State<Measure> {
   int currentVideoOrder = 0;
   int currentCount = 1;
   bool _visible = true;
+  final puck = Get.find<Puck>();
 
   //영상 관련
   final Map<int, VideoPlayerController> _controllers = {};
   final Map<int, VoidCallback> _listeners = {};
 
   bool _lock = true;
-  // late Timer _timer;
-
-  // 운동 영상
-  Set<String> streamUrl = {
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
-    "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
-        "https://amytest2.s3.ap-northeast-2.amazonaws.com/videotest.mp4",
-  };
-
-
-
 
 
   // 영상 재생 순서
@@ -208,8 +173,6 @@ class _Measure extends State<Measure> {
   void initState() {
   super.initState();
 
-
-  login();
   if (mounted && apiVideoList.isNotEmpty) {
     _initFirstController().then((_) {
     // startTimer();
@@ -234,11 +197,6 @@ class _Measure extends State<Measure> {
   // _timer.cancel();
 
   super.dispose();
-  }
-
-
-  void login () async {
-
   }
 
 
@@ -559,9 +517,6 @@ class _Measure extends State<Measure> {
                     onTap: (){
                         getCurrentController(currentVideoOrder).seekTo(Duration.zero);
                         getCurrentController(currentVideoOrder).play();
-                      // 타이머 다시 리셋
-                      // currentCount = 0;
-
                     },
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -575,29 +530,29 @@ class _Measure extends State<Measure> {
                       ]
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 15),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        (puck1.connected && puck2.connected) ? Image.asset('images/blueDot.png', width: 20) : Image.asset('images/redDot.png', width: 20),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 2),
-                          child: Text(puck1.connected && puck2.connected ? "퍽 연결" : "연결 해제"),
-                        ),
-                        Switch(
-                          value: puck1.connected && puck2.connected,
-                          onChanged: (value) async {
-                              await puck1.switchConnect();
-                              await puck2.switchConnect();
-                              setState((){});
-                          },
-                          activeTrackColor: Colors.grey,
-                          activeColor: Colors.black,
-                        )
-                      ]
-                    ),
-                  ),
+                  Obx(() {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 15),
+                      child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            (puck.deviceStatePuck1.value == "connected" && puck.deviceStatePuck2.value == "connected") ? Image.asset('images/blueDot.png', width: 20) : Image.asset('images/redDot.png', width: 20),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 2),
+                              child: Text((puck.deviceStatePuck1.value == "connected" && puck.deviceStatePuck2.value == "connected") ? "퍽 연결" : "연결 해제"),
+                            ),
+                            Switch(
+                              value: (puck.deviceStatePuck1.value == "connected" && puck.deviceStatePuck2.value == "connected"),
+                              onChanged: (value) async {
+                                  await puck.connectDevice();
+                              },
+                              activeTrackColor: Colors.grey,
+                              activeColor: Colors.black,
+                            )
+                          ]
+                      ),
+                    );
+                  }),
                   // const Padding(
                   //   padding: EdgeInsets.only(top: 25, bottom: 20),
                   //   child: Text("지금 아픈 곳이 있나요?",

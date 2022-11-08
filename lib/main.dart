@@ -4,6 +4,8 @@ import 'package:juvis_prac/bluetooth/puck.dart';
 import 'package:juvis_prac/widget/bluetooth_bottom_sheet.dart';
 import 'video/measure.dart';
 import 'video/exercise.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert' as convert;
 
 void main() {
   runApp(const MyApp());
@@ -40,6 +42,27 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   bool toggleIcon = false;
+
+  @override
+  void initState(){
+    super.initState();
+
+    login();
+
+  }
+
+  void login () async {
+    var url = Uri.parse('http://j-test.nonegolab.com/api/login');
+    var response = await http.post(url, body: {'userSn': 1 });
+
+    print("🐸🐸response ${response}");
+    // if(response.statusCode == 200){
+    //   var jsonResponse = convert.jsonDecode(response.body);
+    // print("jsonResponse ${jsonResponse}");
+    // }
+  }
+
+
 
   toggleIconState(bool value) {
     setState(() {
