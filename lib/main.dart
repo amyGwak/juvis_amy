@@ -47,20 +47,20 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState(){
     super.initState();
 
-    login();
+    // login();
 
   }
 
-  void login () async {
-    var url = Uri.parse('http://j-test.nonegolab.com/api/login');
-    var response = await http.post(url, body: {'userSn': 1 });
-
-    print("🐸🐸response ${response}");
-    // if(response.statusCode == 200){
-    //   var jsonResponse = convert.jsonDecode(response.body);
-    // print("jsonResponse ${jsonResponse}");
-    // }
-  }
+  // void login () async {
+  //   var url = Uri.parse('http://j-test.nonegolab.com/api/login');
+  //   var response = await http.post(url, body: {'userSn': 1 });
+  //
+  //   print("🐸🐸response ${response}");
+  //   // if(response.statusCode == 200){
+  //   //   var jsonResponse = convert.jsonDecode(response.body);
+  //   // print("jsonResponse ${jsonResponse}");
+  //   // }
+  // }
 
 
 

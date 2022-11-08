@@ -544,7 +544,7 @@ class _Measure extends State<Measure> {
                             Switch(
                               value: (puck.deviceStatePuck1.value == "connected" && puck.deviceStatePuck2.value == "connected"),
                               onChanged: (value) async {
-                                  await puck.connectDevice();
+                                puck.scanConnect();
                               },
                               activeTrackColor: Colors.grey,
                               activeColor: Colors.black,

@@ -176,6 +176,16 @@ class Puck extends GetxController {
     }
   }
 
+  //Todo: 측정에서 센서 데이터를 받아오기 위해 임시로 만든 함수, 지울 예정입니다.
+  void scanConnect () async {
+    var scanList = await scan();
+    var puck1 = scanList[0];
+    var puck2 = scanList[1];
+
+    connectDevice(puck1);
+    connectDevice(puck2);
+  }
+
   void disconnectDevice(BluetoothDevice device) {
     device.disconnect();
   }
