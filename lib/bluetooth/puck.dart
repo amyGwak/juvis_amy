@@ -113,6 +113,7 @@ class Puck extends GetxController {
 
       device.state.listen((state) async {
         connectStatePuck1.value = state; //puck1의 상태 데이터 저장
+
         switch (state) {
           case BluetoothDeviceState.connecting:
             print('🔥🔥connecting');
@@ -134,6 +135,8 @@ class Puck extends GetxController {
             deviceStatePuck1.value = BluetoothDeviceState.disconnected;
             connectStatePuck1.value = BluetoothDeviceState.disconnected;
             puck1.value = null;
+
+            //특성지우고 => 서비스 지우고
             servicePuck1 = null;
 
             break;
@@ -265,13 +268,9 @@ class Puck extends GetxController {
 
     if (toogle == true) {
       _char.value.listen((event) {
-        if (charKey == '0005') {
+        if (charKey == '0005' && event.length != 0) {
           if (device.name == PUCK1) {
             sensorModePuck1.value.add(event);
-            print(
-                '${sensorModePuck1.value.length - 1} : ${sensorModePuck1.value[sensorModePuck1.length - 1]} : ${event}');
-
-            print("sensorModePuck2, ${sensorModePuck2}");
           } else if (device.name == PUCK2) {
             sensorModePuck2.value.add(event);
           }
