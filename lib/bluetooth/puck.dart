@@ -3,7 +3,12 @@ import 'dart:async';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:get/get_state_manager/get_state_manager.dart';
 import 'package:get/state_manager.dart';
-import 'package:juvis_prac/bluetooth/puck1.dart';
+
+class SensorMode {
+  DateTime timeStamp;
+  List<int> val;
+  SensorMode({required this.val, required this.timeStamp});
+}
 
 const PUCK1 = 'J-1';
 const PUCK2 = 'J-2';
@@ -43,7 +48,7 @@ class Puck extends GetxController {
     "0007": null, //모션에러
   };
 
-  RxList<List<int>> sensorModePuck1 = RxList<List<int>>([]);
+  RxList<SensorMode> sensorModePuck1 = RxList<SensorMode>([]);
 
 //PUCK2
 
@@ -65,7 +70,7 @@ class Puck extends GetxController {
     "0007": null, //모션에러
   };
 
-  RxList<List<int>> sensorModePuck2 = RxList<List<int>>([]);
+  RxList<SensorMode> sensorModePuck2 = RxList<SensorMode>([]);
 
   Future<List> scan() async {
     scanning.value = true;
@@ -105,7 +110,6 @@ class Puck extends GetxController {
   }
 
   void connectDevice(BluetoothDevice device) async {
-    print("device ${device}");
     await device.connect();
 
     //Puck1
@@ -147,7 +151,7 @@ class Puck extends GetxController {
     } else if (device.name == PUCK2) {
       deviceStatePuck2.value = BluetoothDeviceState.connecting;
 
-      device.state.listen((state) {
+      device.state.listen((state) async {
         connectStatePuck2.value = state; //puck1의 상태 데이터 저장
         switch (state) {
           case BluetoothDeviceState.connecting:
@@ -158,7 +162,8 @@ class Puck extends GetxController {
             print('🐳🐳connected');
             deviceStatePuck2.value = BluetoothDeviceState.connected;
             puck2.value = device;
-            setService(device);
+            BluetoothService service = await setService(device);
+            await setCharacterList(device, service);
             // Todo ::: 스캔 리스트에서 연결중인 퍽 삭제
             break;
           case BluetoothDeviceState.disconnecting:
@@ -180,8 +185,6 @@ class Puck extends GetxController {
   //Todo: 측정에서 센서 데이터를 받아오기 위해 임시로 만든 함수, 지울 예정입니다.
   void scanConnect () async {
     var scanList = await scan();
-    print("🐣🐣🐣 ${scanList} scanList!!!!");
-
     var puck1 = scanList[0];
     var puck2 = scanList[1];
 
@@ -221,14 +224,11 @@ class Puck extends GetxController {
       } else if (device.name == PUCK2) {
         charPuck2[uuid] = characteristic;
       }
-      print(charPuck1[uuid]);
     }
   }
 
   setSensorOnOff(bool frequency, bool sensor, BluetoothDevice device) async {
     BluetoothCharacteristic? _char = _deviceToCharList(device)['0004'];
-
-    print("🐣🐣🐣🐣🐣🐣🐣🐣🐣device ${device}");
 
     if (_char == null || _char.properties.write == false) return;
 
@@ -239,7 +239,6 @@ class Puck extends GetxController {
     } else if (frequency == true && sensor == false) {
       await _char.write([16]);
     } else if (frequency == false && sensor == true) {
-      print("here!!!");
       await _char.write([1]);
     } else if (frequency == false && sensor == false) {
       await _char.write([0]);
@@ -274,11 +273,7 @@ class Puck extends GetxController {
   }
 
   notify(String charKey, BluetoothDevice device, bool toogle) async {
-    print("notify click!");
     BluetoothCharacteristic? _char = _deviceToCharList(device)[charKey];
-
-    print("_char!!! ${_char}");
-
 
     if (_char == null || _char.properties.notify == false) return;
 
@@ -289,9 +284,11 @@ class Puck extends GetxController {
       _char.value.listen((event) {
         if (charKey == '0005' && event.length != 0) {
           if (device.name == PUCK1) {
-            sensorModePuck1.value.add(event);
+            sensorModePuck1.value
+                .add(SensorMode(timeStamp: DateTime.now(), val: event));
           } else if (device.name == PUCK2) {
-            sensorModePuck2.value.add(event);
+            sensorModePuck2.value
+                .add(SensorMode(timeStamp: DateTime.now(), val: event));
           }
         }
       });
