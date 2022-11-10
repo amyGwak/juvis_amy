@@ -1,5 +1,5 @@
 import 'dart:ffi';
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart';
@@ -8,7 +8,10 @@ import 'dart:async';
 import '../popup.dart';
 import 'exVideo.dart';
 import 'package:juvis_prac/bluetooth/puck.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:get/get.dart';
+
 
 class Measure extends StatefulWidget {
   const Measure({Key? key}) : super(key:key);
@@ -17,11 +20,29 @@ class Measure extends StatefulWidget {
   _Measure createState() => _Measure();
 }
 
+class SensorObjPuck {
+  String deviceName;
+  String deviceId;
+  int exSn;
+  int userExCnt;
+  List<SensorMode> sensorVal;
+
+  SensorObjPuck({required this.deviceName
+      , required this.deviceId
+      , required this.exSn
+    , required this.userExCnt, required this.sensorVal});
+
+  @override
+  String toString() {
+    return '{"deviceName": "${deviceName}", "deviceId": "${deviceId}", "exSn": ${exSn}, "userExCnt": $userExCnt, "sensorVal": $sensorVal}';
+  }
+}
+
 class _Measure extends State<Measure> {
   final puck = Get.find<Puck>();
 
-  List<List<int>> sensorDataPuck1 = [];
-  List<List<int>> sensorDataPuck2 = [];
+  List<SensorMode> sensorDataPuck1 = [];
+  List<SensorMode> sensorDataPuck2 = [];
 
   List<Map<String, dynamic>> sensorData = [];
 
@@ -37,6 +58,7 @@ class _Measure extends State<Measure> {
   bool _lock = true;
 
   final Map<String, dynamic> sensorCount = {};
+  late final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
 
   // 영상 재생 순서
 
@@ -64,7 +86,7 @@ class _Measure extends State<Measure> {
           "exSeq": 1,
           "exName": "스쿼트",
           "exKcal": 20,
-          "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
+          "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
           "exDesc": "설명",
           "completeyn": "Y"
         },
@@ -98,86 +120,86 @@ class _Measure extends State<Measure> {
         "exSeq": 1,
         "exName": "스쿼트",
         "exKcal": 20,
-        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
-        "exDesc": "설명",
-        "completeyn": "Y"
-      },
-      {
-        "uedSeq": 2,
-        "order": 3,
-        "uedExDate": "2022-10-25",
-        "exCd": "break",
-        "uepdShowTime": 0,
-        "uepdExCnt": 5,
-        "uepdResultKcal": 100,
-        "uepdQaSeq": 10,
-        "uepdUserExCnt": 3,
-        "exSeq": 1,
-        "exName": "스쿼트",
-        "exKcal": 20,
         "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
         "exDesc": "설명",
         "completeyn": "Y"
       },
-      {
-        "uedSeq": 1,
-        "order": 4,
-        "uedExDate": "2022-10-25",
-        "exCd": "main",
-        "uepdShowTime": 0,
-        "uepdExCnt": 5,
-        "uepdResultKcal": 100,
-        "uepdQaSeq": 10,
-        "uepdUserExCnt": 3,
-        "exSeq": 1,
-        "exName": "스쿼트",
-        "exKcal": 20,
-        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test4.mp4",
-        "exDesc": "설명",
-        "completeyn": "Y"
-      },
-      {
-        "uedSeq": 2,
-        "order": 5,
-        "uedExDate": "2022-10-25",
-        "exCd": "break",
-        "uepdShowTime": 0,
-        "uepdExCnt": 5,
-        "uepdResultKcal": 100,
-        "uepdQaSeq": 10,
-        "uepdUserExCnt": 3,
-        "exSeq": 1,
-        "exName": "스쿼트",
-        "exKcal": 20,
-        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
-        "exDesc": "설명",
-        "completeyn": "Y"
-      },
-      {
-        "uedSeq": 1,
-        "order": 6,
-        "uedExDate": "2022-10-25",
-        "exCd": "finish",
-        "uepdShowTime": 0,
-        "uepdExCnt": 5,
-        "uepdResultKcal": 100,
-        "uepdQaSeq": 10,
-        "uepdUserExCnt": 3,
-        "exSeq": 1,
-        "exName": "스쿼트",
-        "exKcal": 20,
-        "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/test3.mp4",
-        "exDesc": "설명",
-        "completeyn": "Y"
-      }
+      // {
+      //   "uedSeq": 2,
+      //   "order": 3,
+      //   "uedExDate": "2022-10-25",
+      //   "exCd": "break",
+      //   "uepdShowTime": 0,
+      //   "uepdExCnt": 5,
+      //   "uepdResultKcal": 100,
+      //   "uepdQaSeq": 10,
+      //   "uepdUserExCnt": 3,
+      //   "exSeq": 1,
+      //   "exName": "스쿼트",
+      //   "exKcal": 20,
+      //   "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+      //   "exDesc": "설명",
+      //   "completeyn": "Y"
+      // },
+      // {
+      //   "uedSeq": 1,
+      //   "order": 4,
+      //   "uedExDate": "2022-10-25",
+      //   "exCd": "main",
+      //   "uepdShowTime": 0,
+      //   "uepdExCnt": 5,
+      //   "uepdResultKcal": 100,
+      //   "uepdQaSeq": 10,
+      //   "uepdUserExCnt": 3,
+      //   "exSeq": 1,
+      //   "exName": "스쿼트",
+      //   "exKcal": 20,
+      //   "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+      //   "exDesc": "설명",
+      //   "completeyn": "Y"
+      // },
+      // {
+      //   "uedSeq": 2,
+      //   "order": 5,
+      //   "uedExDate": "2022-10-25",
+      //   "exCd": "break",
+      //   "uepdShowTime": 0,
+      //   "uepdExCnt": 5,
+      //   "uepdResultKcal": 100,
+      //   "uepdQaSeq": 10,
+      //   "uepdUserExCnt": 3,
+      //   "exSeq": 1,
+      //   "exName": "스쿼트",
+      //   "exKcal": 20,
+      //   "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+      //   "exDesc": "설명",
+      //   "completeyn": "Y"
+      // },
+      // {
+      //   "uedSeq": 1,
+      //   "order": 6,
+      //   "uedExDate": "2022-10-25",
+      //   "exCd": "finish",
+      //   "uepdShowTime": 0,
+      //   "uepdExCnt": 5,
+      //   "uepdResultKcal": 100,
+      //   "uepdQaSeq": 10,
+      //   "uepdUserExCnt": 3,
+      //   "exSeq": 1,
+      //   "exName": "스쿼트",
+      //   "exKcal": 20,
+      //   "exUrl": "https://amytest2.s3.ap-northeast-2.amazonaws.com/%E1%84%92%E1%85%B2%E1%84%89%E1%85%B5%E1%86%A8_10%E1%84%8E%E1%85%A9.mp4",
+      //   "exDesc": "설명",
+      //   "completeyn": "Y"
+      // }
   ];
 
 
 
   @override
   void initState() {
-
     super.initState();
+
     sensorDataPuck1 = puck.sensorModePuck1.value;
     sensorDataPuck2 = puck.sensorModePuck2.value;
 
@@ -192,6 +214,30 @@ class _Measure extends State<Measure> {
 
   }
 
+
+
+
+  Future<bool> sendSensorData (totalList) async {
+
+    print("!!!totalList ${totalList}");
+    final SharedPreferences prefs = await _prefs;
+    Uri url = Uri.parse('http://j-test.nonegolab.com/api/sensor/save');
+    final response = await http.post(url, body: totalList.toString(),
+        headers: {
+          "Accept": "application/json;charset=UTF-8",
+          "Content-type":"application/json",
+          "token": prefs.getString('token').toString(),
+        }
+    );
+
+    final res = jsonDecode(response.body)['statuscode'];
+      if(res == 0) {
+        return true;
+      } else {
+        return false;
+    }
+  }
+
   @override
   void deactivate() {
   super.deactivate();
@@ -203,7 +249,7 @@ class _Measure extends State<Measure> {
   _controllers[currentVideoOrder]?.dispose();
   _controllers[currentVideoOrder - 1]?.dispose();
   // _timer.cancel();
-
+  puck.clearSensorData();
   super.dispose();
   }
 
@@ -217,34 +263,69 @@ class _Measure extends State<Measure> {
   void playHandler () {
     var controller = getCurrentController(currentVideoOrder);
 
-    if(controller.value.isPlaying) {
-      controller.pause();
-      puck.notify('0005', puck.puck1.value!, false);
-      puck.notify('0005', puck.puck2.value!, false);
+    if(puck.puck1.value != null && puck.puck2.value != null) {
+      if(controller.value.isPlaying) {
+        controller.pause();
+        puck.notify('0005', puck.puck1.value!, false);
+        puck.notify('0005', puck.puck2.value!, false);
 
-      _visible = true;
-    } else {
-      controller.play();
-      puck.notify('0005', puck.puck1.value!, true);
-      puck.notify('0005', puck.puck2.value!, true);
+        _visible = true;
+      } else {
+        controller.play();
+        puck.notify('0005', puck.puck1.value!, true);
+        puck.notify('0005', puck.puck2.value!, true);
 
-      setState((){
-        _visible = false;
-      });
+        setState((){
+          _visible = false;
+        });
+      }
     }
+
   }
 
-  // Future<void> startTimer () async {
-  //   _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-  //     var controller =  getCurrentController(currentVideoOrder);
-  //     setState((){
-  //       if(controller.value.isPlaying) {
-  //         currentCount++;
-  //       }
-  //     });
-  //   });
-  // }
+  Future<void> splitSensorData (sensorDataPuck1, sensorDataPuck2, order) async {
 
+    // totalSensorData 는 한 영상에 대한 모든 센서데이터
+    // 얘를 5N 으로 분리한다.
+
+    int index1 = (sensorDataPuck1.length / 5).ceil();
+    int index2 = (sensorDataPuck2.length / 5).ceil();
+
+    List<SensorMode> tmpArr1 = [];
+    List<SensorMode> tmpArr2 = [];
+
+    var totalList = [];
+
+    for(var i=0; i < 5; i++){
+      if(i == 4) {
+        tmpArr1 = sensorDataPuck1.sublist(i * index1, sensorDataPuck1.length - 1);
+        tmpArr2 = sensorDataPuck2.sublist(i * index2, sensorDataPuck2.length - 1);
+      } else {
+        tmpArr1 = sensorDataPuck1.sublist(i * index1, (i + 1) * index1);
+        tmpArr2 = sensorDataPuck2.sublist(i * index2, (i + 1) * index2);
+      }
+      totalList.add(SensorObjPuck(
+          deviceName: "J-1",
+          deviceId : puck.puck1.value!.id.toString(),
+          exSn : order,
+          userExCnt: i+1,
+          sensorVal : tmpArr1).toString());
+
+      totalList.add(SensorObjPuck(
+          deviceName: "J-2",
+          deviceId : puck.puck2.value!.id.toString(),
+          exSn : order,
+          userExCnt: i+1,
+          sensorVal : tmpArr2).toString());
+
+      bool response = await sendSensorData(totalList);
+      if(response) {
+        print("❤️❤️❤️❤️❤️❤️❤️❤️response!!! ${response}❤️❤️❤️❤️❤️❤️");
+      }
+    }
+    puck.clearSensorData();
+
+  }
 
 
   VoidCallback _listenerSpawner(index) {
@@ -259,6 +340,7 @@ class _Measure extends State<Measure> {
       duration = controller.value.duration.inSeconds;
       position = controller.value.position.inSeconds;
 
+      getCurrentCount(position);
 
       setState((){
         if(duration! - position! < 1) {
@@ -305,15 +387,22 @@ class _Measure extends State<Measure> {
     }
 
 
-  void _stopController(int index) {
+  Future<void> _stopController(int index) async {
     var controller = getCurrentController(index);
 
-    controller.removeListener(_listeners[index]!);
+
+    if(index == apiVideoList.length) {
+      print("✅✅✅✅✅----------------------------------------다음 영상 종료 ${index}");
+      // await splitSensorData(puck.sensorModePuck1, puck.sensorModePuck2, index);
+    }
+
+    if(puck.puck1.value != null && puck.puck2.value != null) {
+      await puck.setSensorOnOff(false, false, puck.puck1.value!);
+      await puck.setSensorOnOff(false, false, puck.puck2.value!);
+    }
+
     controller.pause();
-
-    puck.notify('0005', puck.puck1.value!, false);
-    puck.notify('0005', puck.puck2.value!, false);
-
+    controller.removeListener(_listeners[index]!);
   }
 
 
@@ -331,7 +420,6 @@ class _Measure extends State<Measure> {
   //Todo: 해당 함수는 다음 영상을 준비 해주는 것만 하기
   void _nextVideo () async {
     if(_lock || currentVideoOrder == apiVideoList.length - 1) {
-      //마지막 비디오라면
       return;
     }
 
@@ -347,14 +435,13 @@ class _Measure extends State<Measure> {
     if(currentVideoOrder == apiVideoList.length - 1){
       //마지막 비디오면..
       _lock = false;
+
     } else {
       //마지막 비디오 아니면, 다음 비디오 controller 준비한다.
       await _initNextController(currentVideoOrder + 1);
       await _listenController(currentVideoOrder + 1);
       await _playController(currentVideoOrder + 1);
-
       _lock = false;
-
     }
 
     setState((){
@@ -367,25 +454,24 @@ class _Measure extends State<Measure> {
   Future<void> _playController(int index) async {
     var controller = getCurrentController(index);
 
-
-
-    if(index > 0){
-      //1번째 이상 비디오에서 이전 비디오를 중지
-      _stopController(index - 1);
+    if(index == 0) {
+      // 최초 재생 시 센서 모드 on
+      // await puck.notify('0005', puck.puck1.value!, true);
+      // await puck.notify('0005', puck.puck2.value!, true);
+    } else {
+      //2번째 비디오부터 이전 비디오를 중지
+      await _stopController(index - 1);
+      // splitSensorData(puck.sensorModePuck1, puck.sensorModePuck2, index);
     }
 
-    if(index == 0) {
-      // 재생 되는 순간, 센서데이터 수집
-      await puck.setSensorOnOff(
-          false, true, puck.puck1.value!);
-      await puck.setSensorOnOff(
-          false, true, puck.puck2.value!);
-      puck.notify('0005', puck.puck1.value!, true);
-      puck.notify('0005', puck.puck2.value!, true);
+    // 센서 on
+    if(puck.puck1.value != null && puck.puck2.value != null) {
+      puck.setSensorOnOff(false, true, puck.puck1.value!);
+      puck.setSensorOnOff(false, true, puck.puck2.value!);
     }
 
     await controller.play();
-    // sensorData = [];
+    currentCount = 1;
   }
 
   void _toggle(){
@@ -394,47 +480,15 @@ class _Measure extends State<Measure> {
       });
   }
 
-  int getCount () {
-    var controller = getCurrentController(currentVideoOrder);
-    int position = controller.value.position.inSeconds + 1;
+  void getCurrentCount (int position) {
+    //이거는 서버에서 내려주는 값, 결국 파라미터로 받아서 내려올 예정, 현재는 2초로 둠
+    int exSec = 2;
+    currentCount = (position / exSec).floor() + 1;
 
-    setState((){
-
-      if(position == 0) {
-        currentCount = 1;
-      } else {
-        if(position % 2 == 0) {
-          currentCount = (position / 2).floor();
-          print("🐳🐳sensorData ${sensorData}");
-        } else {
-          // 1,3,5
-          currentCount = (position / 2).floor() + 1;
-
-
-          sensorCount["deviceName"] = "J-1";
-          sensorCount["deviceUUid"] = puck.puck1.value!.id;
-          sensorCount["exSN"] = currentVideoOrder + 1;
-          sensorCount["userExCnt"] = currentCount;
-          sensorCount["val"] = sensorDataPuck1;
-
-          sensorCount["deviceName"] = "J-2";
-          sensorCount["deviceUUid"] = puck.puck2.value!.id;
-          sensorCount["exSN"] = currentVideoOrder + 1;
-          sensorCount["userExCnt"] = currentCount;
-          sensorCount["val"] = sensorDataPuck2;
-
-          // count가 증가하는 시점, 여기까지 모은 데이터를 sensorData에 넣어준다.
-          // 넣어주는데 no만 붙여서 넣어준다... (이건 데이터 오면)
-          sensorData.add(sensorCount);
-
-          // 블루투스 센서 배열 넣어주고, 데이터 비우기
-          puck.clearSensorData();
-        }
-      }
-    });
-
-    return currentCount;
   }
+
+
+
 
   // void showKeepGoingAlert () {
   //   List<String> menuList = ["계속", "-", "이번 동작 스킵", "측정 중단 후 다음에 할래요"];
@@ -503,8 +557,6 @@ class _Measure extends State<Measure> {
 
   @override
   Widget build(BuildContext context) {
-    print("sensorDataPuck1 ${sensorDataPuck1}");
-    print("sensorDataPuck2 ${sensorDataPuck2}");
     return Scaffold (
             appBar: AppBar(
               backgroundColor: Colors.white,
@@ -557,14 +609,14 @@ class _Measure extends State<Measure> {
                                       },
                                       style: TextButton.styleFrom(
                                         textStyle: const TextStyle(fontSize: 16),
-                                        backgroundColor:  getCount() == int.parse("$i") ? Colors.orangeAccent : Colors.transparent,
+                                        backgroundColor: currentCount == int.parse("$i") ? Colors.orangeAccent : Colors.transparent,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(100), // <-- Radius
                                         ),
                                       ),
                                       child: Text("$i",
                                           style: TextStyle(
-                                            color:  getCount() == int.parse("$i") ? Colors.black : Colors.grey,
+                                            color:  currentCount == int.parse("$i") ? Colors.black : Colors.grey,
                                           )),
                                     ),
                                   ),
@@ -713,6 +765,7 @@ class FindPuck extends StatelessWidget {
     );
   }
 }
+
 
 
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:get/get_state_manager/get_state_manager.dart';
@@ -7,7 +8,14 @@ import 'package:get/state_manager.dart';
 class SensorMode {
   DateTime timeStamp;
   List<int> val;
+
   SensorMode({required this.val, required this.timeStamp});
+
+  @override
+  String toString() {
+    // TODO: implement toString
+    return '{"timestamp":"${timeStamp}", "val":${val} }';
+  }
 }
 
 const PUCK1 = 'J-1';
@@ -71,6 +79,7 @@ class Puck extends GetxController {
   };
 
   RxList<SensorMode> sensorModePuck2 = RxList<SensorMode>([]);
+  int index = 1;
 
   Future<List> scan() async {
     scanning.value = true;
@@ -201,7 +210,6 @@ class Puck extends GetxController {
 
     BluetoothService loopCoreService = services.firstWhere(
         (s) => s.uuid.toString().toUpperCase().substring(4, 8) == '4A56');
-    print('🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥');
     print(loopCoreService);
 
     if (device.name == PUCK1)
@@ -232,8 +240,6 @@ class Puck extends GetxController {
 
     if (_char == null || _char.properties.write == false) return;
 
-    print('🔥🔥🔥🔥');
-
     if (frequency == true && sensor == true) {
       await _char.write([17]);
     } else if (frequency == true && sensor == false) {
@@ -257,8 +263,15 @@ class Puck extends GetxController {
     BluetoothCharacteristic? _char = _deviceToCharList(device)['0003'];
     if (_char == null || _char.properties.write == false) return;
 
+    await _char.setNotifyValue(true);
+
+    _char.value.listen((value) {
+      print("value!!!!! ${value}");
+    });
+
     await _char.write([intensity]);
     read('0003', device);
+
   }
 
   read(String charKey, BluetoothDevice device) async {
@@ -295,10 +308,13 @@ class Puck extends GetxController {
     }
   }
 
-  void clearSensorData () {
+  void clearSensorData () async {
     sensorModePuck1.clear();
     sensorModePuck2.clear();
+
+    print("🐣🐣🐣clear sensorData!!🐣🐣");
   }
+
 
   Map<String, BluetoothCharacteristic?> _deviceToCharList(
       BluetoothDevice device) {

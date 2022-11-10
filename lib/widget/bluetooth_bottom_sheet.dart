@@ -181,6 +181,8 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                             ElevatedButton(
                                 onPressed: () {
                                   puck.setSensorOnOff(
+                                      true, true, puck.puck1.value!);
+                                  puck.setSensorOnOff(
                                       true, true, puck.puck2.value!);
                                 },
                                 child: Text('주파on/센서on')),

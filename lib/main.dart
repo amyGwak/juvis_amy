@@ -5,7 +5,8 @@ import 'package:juvis_prac/widget/bluetooth_bottom_sheet.dart';
 import 'video/measure.dart';
 import 'video/exercise.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert' as convert;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 void main() {
   runApp(const MyApp());
@@ -42,6 +43,8 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   bool toggleIcon = false;
+  late final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
+
 
   @override
   void initState(){
@@ -51,17 +54,26 @@ class _MyHomePageState extends State<MyHomePage> {
 
   }
 
-  // void login () async {
-  //   var url = Uri.parse('http://j-test.nonegolab.com/api/login');
-  //   var response = await http.post(url, body: {'userSn': 1 });
-  //
-  //   print("🐸🐸response ${response}");
-  //   // if(response.statusCode == 200){
-  //   //   var jsonResponse = convert.jsonDecode(response.body);
-  //   // print("jsonResponse ${jsonResponse}");
-  //   // }
-  // }
+  Future<void> login () async {
+    Uri url = Uri.parse('http://j-test.nonegolab.com/api/login');
+    final response = await http.post(url, body: json.encode({'userSn': "1", 'pToken': "111" }),
+        headers: {
+          "Accept": "application/json;charset=UTF-8",
+          "content-type":"application/json"
+        }
+    );
 
+    print("🐸🐸response ${jsonDecode(response.body)}");
+
+    var res = jsonDecode(response.body);
+    String token = res["result"]["token"];
+    print("token, ${token}");
+    final SharedPreferences prefs = await _prefs;
+    prefs.setString('token', token).then((bool success){
+      print('success ${success}');
+    });
+
+  }
 
 
   toggleIconState(bool value) {
@@ -153,6 +165,25 @@ class _MyHomePageState extends State<MyHomePage> {
               child: const Text("타이머 테스트"),
               onPressed: () {
                 Navigator.pushNamed(context, '/timer');
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 20),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.only(
+                    left: 16, right: 16, top: 10, bottom: 10),
+                textStyle: const TextStyle(fontSize: 16),
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10), // <-- Radius
+                ),
+              ),
+              child: const Text("로그인"),
+              onPressed: () async{
+                await login();
               },
             ),
           ),
