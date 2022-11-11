@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:get/get_state_manager/get_state_manager.dart';
 import 'package:get/state_manager.dart';
@@ -16,6 +14,14 @@ class SensorMode {
     // TODO: implement toString
     return '{"timestamp":"${timeStamp}", "val":${val} }';
   }
+}
+
+class SensorValue {
+  DateTime timeStamp;
+  List<int> val;
+
+  SensorValue({required this.val, required this.timeStamp});
+
 }
 
 const PUCK1 = 'J-1';
@@ -79,7 +85,6 @@ class Puck extends GetxController {
   };
 
   RxList<SensorMode> sensorModePuck2 = RxList<SensorMode>([]);
-  int index = 1;
 
   Future<List> scan() async {
     scanning.value = true;
@@ -130,7 +135,6 @@ class Puck extends GetxController {
 
         switch (state) {
           case BluetoothDeviceState.connecting:
-            print('🔥🔥connecting');
             puck1.value = device;
             break;
           case BluetoothDeviceState.connected:
@@ -142,10 +146,8 @@ class Puck extends GetxController {
             await setCharacterList(device, service);
             break;
           case BluetoothDeviceState.disconnecting:
-            print('🔥🔥disconnecting');
             break;
           case BluetoothDeviceState.disconnected:
-            print('🔥🔥disconnected');
             deviceStatePuck1.value = BluetoothDeviceState.disconnected;
             connectStatePuck1.value = BluetoothDeviceState.disconnected;
             puck1.value = null;
@@ -164,7 +166,6 @@ class Puck extends GetxController {
         connectStatePuck2.value = state; //puck1의 상태 데이터 저장
         switch (state) {
           case BluetoothDeviceState.connecting:
-            print('🐳🐳connecting');
             puck2.value = device;
             break;
           case BluetoothDeviceState.connected:
@@ -176,10 +177,9 @@ class Puck extends GetxController {
             // Todo ::: 스캔 리스트에서 연결중인 퍽 삭제
             break;
           case BluetoothDeviceState.disconnecting:
-            print('🐳🐳disconnecting');
             break;
           case BluetoothDeviceState.disconnected:
-            print('🐳🐳disconnected');
+
             deviceStatePuck2.value = BluetoothDeviceState.disconnected;
             connectStatePuck2.value = BluetoothDeviceState.disconnected;
             puck2.value = null;
@@ -225,8 +225,7 @@ class Puck extends GetxController {
     for (int i = 0; i < charList.length; i++) {
       String uuid = charList[i].uuid.toString().toUpperCase().substring(4, 8);
       BluetoothCharacteristic characteristic = charList[i];
-      print('🐳🐳🐳🐳🐳🐳🐳🐳');
-      print(characteristic);
+
       if (device.name == PUCK1) {
         charPuck1[uuid] = characteristic;
       } else if (device.name == PUCK2) {
@@ -246,8 +245,10 @@ class Puck extends GetxController {
       await _char.write([16]);
     } else if (frequency == false && sensor == true) {
       await _char.write([1]);
+      await _char.read();
     } else if (frequency == false && sensor == false) {
       await _char.write([0]);
+      await _char.read();
     }
   }
 
@@ -266,7 +267,6 @@ class Puck extends GetxController {
     await _char.setNotifyValue(true);
 
     _char.value.listen((value) {
-      print("value!!!!! ${value}");
     });
 
     await _char.write([intensity]);
@@ -281,7 +281,6 @@ class Puck extends GetxController {
 
     List<int> result = await _char.read();
 
-    print(result);
     return result;
   }
 
@@ -297,10 +296,10 @@ class Puck extends GetxController {
       _char.value.listen((event) {
         if (charKey == '0005' && event.length != 0) {
           if (device.name == PUCK1) {
-            sensorModePuck1.value
+            sensorModePuck1
                 .add(SensorMode(timeStamp: DateTime.now(), val: event));
           } else if (device.name == PUCK2) {
-            sensorModePuck2.value
+            sensorModePuck2
                 .add(SensorMode(timeStamp: DateTime.now(), val: event));
           }
         }
@@ -308,12 +307,38 @@ class Puck extends GetxController {
     }
   }
 
-  void clearSensorData () async {
-    sensorModePuck1.clear();
-    sensorModePuck2.clear();
+  Future<void> getPuck1SensorValue(String charKey, bool toggle, callback) async {
 
-    print("🐣🐣🐣clear sensorData!!🐣🐣");
+    BluetoothCharacteristic? _char1 = _deviceToCharList(puck1.value!)[charKey];
+    await _char1?.setNotifyValue(toggle);
+
+
+    if (_char1 != null && _char1.properties.notify) {
+      if (toggle == true) {
+        _char1.value.listen((event) {
+          callback(event);
+        });
+      }
+    }
   }
+
+  Future<void> getPuck2SensorValue(String charKey, bool toggle, callback) async {
+
+    BluetoothCharacteristic? _char2 = _deviceToCharList(puck2.value!)[charKey];
+    await _char2?.setNotifyValue(toggle);
+
+    if (_char2 != null && _char2.properties.notify) {
+      if (toggle == true) {
+        _char2.value.listen((event) {
+          callback(event);
+        });
+      }
+    }
+  }
+
+
+
+
 
 
   Map<String, BluetoothCharacteristic?> _deviceToCharList(

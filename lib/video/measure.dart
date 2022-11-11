@@ -12,6 +12,18 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:get/get.dart';
 
+class CoreValue {
+  DateTime timeStamp;
+  List<int> val;
+
+  CoreValue({required this.val, required this.timeStamp});
+
+  @override
+  String toString() {
+    return '{"timeStamp":"${timeStamp}", "val":${val} }';
+  }
+}
+
 
 class Measure extends StatefulWidget {
   const Measure({Key? key}) : super(key:key);
@@ -25,7 +37,7 @@ class SensorObjPuck {
   String deviceId;
   int exSn;
   int userExCnt;
-  List<SensorMode> sensorVal;
+  List<dynamic> sensorVal;
 
   SensorObjPuck({required this.deviceName
       , required this.deviceId
@@ -41,9 +53,6 @@ class SensorObjPuck {
 class _Measure extends State<Measure> {
   final puck = Get.find<Puck>();
 
-  List<SensorMode> sensorDataPuck1 = [];
-  List<SensorMode> sensorDataPuck2 = [];
-
   List<Map<String, dynamic>> sensorData = [];
 
 
@@ -56,19 +65,10 @@ class _Measure extends State<Measure> {
   final Map<int, VoidCallback> _listeners = {};
 
   bool _lock = true;
+  int cnt = 0;
 
   final Map<String, dynamic> sensorCount = {};
   late final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
-
-  // 영상 재생 순서
-
-  // initController (20개 컨트롤러 준비) - 모든 controller 전부
-  // listenController (준비된 컨트롤러에 listener 구독) - controller 별로 다르다. 다음 영상 준비 함수 필
-  // playController (재생시킨다) - play()만
-  // stopController (중지됬을 때) - pause(), 리스너 구독을 여기서 해제할 필요 있나? 삭제하면..?
-  // removeController (재생이 끝난 -2번째 비디오를 삭제한다) - 두번째 영상전꺼를 아예 controllers에서 삭제, dispose
-  // reset 하는 함수 ( 모든 controller dispose, 최상위 dispose에서 )
-
 
 
   // api가 아래처럼 내려온다.
@@ -200,12 +200,8 @@ class _Measure extends State<Measure> {
   void initState() {
     super.initState();
 
-    sensorDataPuck1 = puck.sensorModePuck1.value;
-    sensorDataPuck2 = puck.sensorModePuck2.value;
-
     if (mounted && apiVideoList.isNotEmpty) {
       _initFirstController().then((_) {
-      // startTimer();
         _listenController(0);
         _playController(0);
         _lock = false;
@@ -216,10 +212,8 @@ class _Measure extends State<Measure> {
 
 
 
-
   Future<bool> sendSensorData (totalList) async {
 
-    print("!!!totalList ${totalList}");
     final SharedPreferences prefs = await _prefs;
     Uri url = Uri.parse('http://j-test.nonegolab.com/api/sensor/save');
     final response = await http.post(url, body: totalList.toString(),
@@ -248,8 +242,8 @@ class _Measure extends State<Measure> {
   // 마지막 controller와 그 이전 controller 지워주기
   _controllers[currentVideoOrder]?.dispose();
   _controllers[currentVideoOrder - 1]?.dispose();
-  // _timer.cancel();
-  puck.clearSensorData();
+
+  // puck.clearSensorData();
   super.dispose();
   }
 
@@ -283,77 +277,94 @@ class _Measure extends State<Measure> {
 
   }
 
+
   Future<void> splitSensorData (sensorDataPuck1, sensorDataPuck2, order) async {
 
-    // totalSensorData 는 한 영상에 대한 모든 센서데이터
-    // 얘를 5N 으로 분리한다.
+    int count = 5;
 
-    int index1 = (sensorDataPuck1.length / 5).ceil();
-    int index2 = (sensorDataPuck2.length / 5).ceil();
+    int count1 = (sensorDataPuck1.length / count).ceil();
+    int count2 = (sensorDataPuck2.length / count).ceil();
 
-    List<SensorMode> tmpArr1 = [];
-    List<SensorMode> tmpArr2 = [];
+
+    var tmpArr1 = [];
+    var tmpArr2 = [];
 
     var totalList = [];
 
-    for(var i=0; i < 5; i++){
-      if(i == 4) {
-        tmpArr1 = sensorDataPuck1.sublist(i * index1, sensorDataPuck1.length - 1);
-        tmpArr2 = sensorDataPuck2.sublist(i * index2, sensorDataPuck2.length - 1);
+    for(var i=1; i<= count; i++){
+      if(i != count) {
+        //마지막 아닐때,
+        tmpArr1 = sensorDataPuck1.sublist((i - 1) * count1, i * count1);
+        tmpArr2 = sensorDataPuck2.sublist((i - 1) * count2, i * count2);
+
       } else {
-        tmpArr1 = sensorDataPuck1.sublist(i * index1, (i + 1) * index1);
-        tmpArr2 = sensorDataPuck2.sublist(i * index2, (i + 1) * index2);
+        //마지막일때 배열 끝까지
+        tmpArr1 = sensorDataPuck1.sublist((i - 1) * count1);
+        tmpArr2 = sensorDataPuck2.sublist((i - 1) * count2);
       }
+
       totalList.add(SensorObjPuck(
           deviceName: "J-1",
           deviceId : puck.puck1.value!.id.toString(),
           exSn : order,
-          userExCnt: i+1,
-          sensorVal : tmpArr1).toString());
+          userExCnt: i,
+          sensorVal : tmpArr1
+        ).toString()
+      );
 
       totalList.add(SensorObjPuck(
           deviceName: "J-2",
           deviceId : puck.puck2.value!.id.toString(),
           exSn : order,
-          userExCnt: i+1,
-          sensorVal : tmpArr2).toString());
+          userExCnt: i,
+          sensorVal : tmpArr2
+        ).toString()
+      );
+
 
       bool response = await sendSensorData(totalList);
       if(response) {
-        print("❤️❤️❤️❤️❤️❤️❤️❤️response!!! ${response}❤️❤️❤️❤️❤️❤️");
+        print("response ${response}");
       }
     }
-    puck.clearSensorData();
 
+    // puck.clearSensorData();
+    core1_values = [];
+    core2_values = [];
   }
 
 
   VoidCallback _listenerSpawner(index) {
-
     var controller = getCurrentController(index);
 
     return () {
 
-      int? duration;
-      int? position;
+      int duration;
+      int position;
 
       duration = controller.value.duration.inSeconds;
       position = controller.value.position.inSeconds;
 
       getCurrentCount(position);
+      is_save = true;
 
-      setState((){
-        if(duration! - position! < 1) {
-          // 0 이거나 음수일 때 = 영상 재생 중일 때
-          if(index < apiVideoList.length - 1) {
-            // 영상이 마지막 영상이 아닐때, 다음 비디오로 넘어간다.
-            _nextVideo();
-          } else {
-            // 마지막 영상이면 운동 완료 페이지로 이동시켜줘야 함
-            // 기획에 따라 재정비
-          }
+      if(duration - position == 0){
+        is_save = false;
+      }
+
+      if(duration - position < 1) {
+        // 영상 종료 까지 1초 미만
+        if(index != apiVideoList.length - 1) {
+          // 영상이 마지막 영상이 아닐때, 다음 비디오로 넘어간다.
+          _nextVideo();
+        } else {
+          _lastVideo(cnt);
+          cnt++;
+          // 마지막 영상이면 운동 완료 페이지로 이동시켜줘야 함
         }
-      });
+      }
+
+      setState((){});
     };
   }
 
@@ -362,15 +373,14 @@ class _Measure extends State<Measure> {
   Future<void> _initFirstController () async {
     _controllers[currentVideoOrder] = VideoPlayerController.network(apiVideoList[0]["exUrl"]);
     await _controllers[currentVideoOrder]?.initialize();
+    await _sensorControl(true, true);
 
   }
 
   Future<void> _initNextController(int index) async {
     // index 로 넘어온 것들만 초기화
-    print("${index} index!!");
     var controller = VideoPlayerController.network(apiVideoList[index]["exUrl"]);
     _controllers[index] = controller;
-    print("_controllers[index] ${_controllers[index]}");
     await controller.initialize();
   }
 
@@ -378,7 +388,7 @@ class _Measure extends State<Measure> {
 
   // controller 아예 삭제
   void _removeController() {
-    var index = currentVideoOrder - 2;
+    var index = currentVideoOrder - 1;
     var controller = getCurrentController(index);
 
       controller.dispose();
@@ -389,18 +399,6 @@ class _Measure extends State<Measure> {
 
   Future<void> _stopController(int index) async {
     var controller = getCurrentController(index);
-
-
-    if(index == apiVideoList.length) {
-      print("✅✅✅✅✅----------------------------------------다음 영상 종료 ${index}");
-      // await splitSensorData(puck.sensorModePuck1, puck.sensorModePuck2, index);
-    }
-
-    if(puck.puck1.value != null && puck.puck2.value != null) {
-      await puck.setSensorOnOff(false, false, puck.puck1.value!);
-      await puck.setSensorOnOff(false, false, puck.puck2.value!);
-    }
-
     controller.pause();
     controller.removeListener(_listeners[index]!);
   }
@@ -426,14 +424,12 @@ class _Measure extends State<Measure> {
     _lock = true;
 
     //Todo: stop & remove 를 묶는 함수를 만들어서 nextVideo 전에 호출
-    if(currentVideoOrder >= 2) {
-      // 첫번째, 두번째 비디오빼고, 뒤에서 세번째 비디오부터 지운다.
+    if(currentVideoOrder >= 1) {
+      // 첫번째 제외, 2번째 비디오부터 지운다.
       _removeController();
     }
 
-
     if(currentVideoOrder == apiVideoList.length - 1){
-      //마지막 비디오면..
       _lock = false;
 
     } else {
@@ -450,29 +446,70 @@ class _Measure extends State<Measure> {
 
   }
 
+  void _lastVideo (int cnt) async {
+    if(cnt > 0) {
+      return;
+    }
+    await splitSensorData(core1_values, core2_values, apiVideoList.length);
+    await _sensorControl(false, false);
+
+
+  }
+
+  Future<void> _sensorControl (bool isSensorOn,bool needNoti) async {
+    // 센서 on
+    if(puck.puck1.value != null && puck.puck2.value != null) {
+      await puck.setSensorOnOff(false, isSensorOn, puck.puck1.value!);
+      await puck.setSensorOnOff(false, isSensorOn, puck.puck2.value!);
+    }
+
+    if(needNoti) {
+      await puck.notify('0005', puck.puck1.value!, isSensorOn);
+      await puck.notify('0005', puck.puck2.value!, isSensorOn);
+    }
+
+  }
+
+  var core1_values = [];
+  var core2_values = [];
+  var is_save = false; // 센서 데이터 배열에 넣기 여부
+
+
+  sensorNotiCallback1 (event) {
+    if(!is_save || event.length == 0) {
+      return;
+    }
+    core1_values.add(CoreValue(timeStamp:DateTime.now(), val: event).toString());
+  }
+
+  sensorNotiCallback2 (event) {
+    if(!is_save || event.length == 0) {
+      return;
+    }
+    core2_values.add(CoreValue(timeStamp:DateTime.now(), val: event).toString());
+  }
+
 
   Future<void> _playController(int index) async {
     var controller = getCurrentController(index);
 
+    // 센서 on
+    await puck.getPuck1SensorValue('0005', true, sensorNotiCallback1);
+    await puck.getPuck2SensorValue('0005', true, sensorNotiCallback2);
+
     if(index == 0) {
       // 최초 재생 시 센서 모드 on
-      // await puck.notify('0005', puck.puck1.value!, true);
-      // await puck.notify('0005', puck.puck2.value!, true);
-    } else {
-      //2번째 비디오부터 이전 비디오를 중지
-      await _stopController(index - 1);
-      // splitSensorData(puck.sensorModePuck1, puck.sensorModePuck2, index);
-    }
 
-    // 센서 on
-    if(puck.puck1.value != null && puck.puck2.value != null) {
-      puck.setSensorOnOff(false, true, puck.puck1.value!);
-      puck.setSensorOnOff(false, true, puck.puck2.value!);
+    } else {
+      // 2번째 비디오부터 이전 비디오를 중지
+      await _stopController(index - 1);
+      await splitSensorData(core1_values, core2_values, index);
     }
 
     await controller.play();
     currentCount = 1;
   }
+
 
   void _toggle(){
       setState((){
@@ -487,73 +524,6 @@ class _Measure extends State<Measure> {
 
   }
 
-
-
-
-  // void showKeepGoingAlert () {
-  //   List<String> menuList = ["계속", "-", "이번 동작 스킵", "측정 중단 후 다음에 할래요"];
-  //   showDialog(
-  //     context: context,
-  //     builder: (context) {
-  //       return AlertDialog(
-  //         backgroundColor: Colors.white,
-  //         shape: const RoundedRectangleBorder(
-  //           borderRadius: BorderRadius.all(
-  //             Radius.circular(20.0),
-  //           ),
-  //         ),
-  //         contentPadding: const EdgeInsets.all(10.0),
-  //         title: const Text("진행 의사",
-  //             style: TextStyle(fontWeight: FontWeight.bold),
-  //             textAlign: TextAlign.center
-  //         ),
-  //         content: SizedBox(
-  //           height: 320,
-  //           child: Column(
-  //             children: [
-  //               const Text("너무 힘들다면 다음 동작으로"),
-  //               const Padding(
-  //                 padding: EdgeInsets.only(bottom: 40),
-  //                 child: Text("넘어갈까요?"),
-  //               ),
-  //               const Divider(),
-  //               SizedBox(
-  //                 width: 240,
-  //                 height: 220,
-  //                 child: ListView.separated(
-  //                   itemCount: menuList.length,
-  //                   itemBuilder: (context, index) {
-  //                     return Column(
-  //                       // mainAxisAlignment: MainAxisAlignment.center,
-  //                       children: [
-  //                         Container(
-  //                           height: 40,
-  //                           alignment: Alignment.center,
-  //                           child: ListTile(
-  //                             onTap: (){
-  //                               print("${index} 🦧🦧");
-  //                               if(index == 0) {
-  //                                 Navigator.pop(context);
-  //                               }
-  //                             },
-  //                             leading: Text(menuList[index], textAlign: TextAlign.center),
-  //                             selectedColor: Colors.blue,
-  //                             textColor: Colors.grey,
-  //                           ),
-  //                         ),
-  //                       ],
-  //                     );
-  //                   },
-  //                   separatorBuilder: (BuildContext context, int index) => const Divider(),
-  //                 )
-  //               )
-  //             ]
-  //           )
-  //         )
-  //       );
-  //     }
-  //   );
-  // }
 
   @override
   Widget build(BuildContext context) {

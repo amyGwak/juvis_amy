@@ -101,7 +101,11 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                           leading: Icon(Icons.device_hub),
                           title: Text(puck
                               .getTranslatedDeviceName(puck.puck1.value!.name)),
-                          subtitle: Text(puck.deviceStatePuck1.toString()),
+                          subtitle: Column(
+                          children: [
+                              Text(puck.deviceStatePuck1.toString()),
+                              Text(puck.puck1.value!.id.toString()),
+                            ]),
                           trailing: GestureDetector(
                             child: Icon(Icons.close),
                             onTap: () {
@@ -206,6 +210,7 @@ class _BluetoothBottomSheetState extends State<BluetoothBottomSheet> {
                                       puck.scanList[index].name)),
                                   subtitle: Column(children: <Widget>[
                                     Text(puck.scanList[index].name),
+                                    Text(puck.scanList[index].id.toString()),
                                   ]),
                                   trailing: GestureDetector(
                                     onTap: () {
